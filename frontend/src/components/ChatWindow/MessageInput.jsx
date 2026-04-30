@@ -56,6 +56,21 @@ export default function MessageInput({ onSend, selectedUser }) {
     }
   }, [isRecording])
 
+  // Pressing Enter while recording should finish and send the voice note.
+  useEffect(() => {
+    if (!isRecording) return
+
+    const handleRecordingKeyDown = (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        handleStopVoiceRecord()
+      }
+    }
+
+    window.addEventListener('keydown', handleRecordingKeyDown)
+    return () => window.removeEventListener('keydown', handleRecordingKeyDown)
+  }, [isRecording])
+
   const handleChange = (e) => {
     setText(e.target.value)
     if (socket && selectedUser) {
