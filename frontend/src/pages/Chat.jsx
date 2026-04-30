@@ -51,7 +51,16 @@ export default function Chat() {
 
            try {
              const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
-             return { ...conv, lastMessage: { ...lastMessage, content } }
+             
+             // Determine preview text based on message type
+             let previewContent = content
+             if (lastMessage.messageType === 'voice') {
+               previewContent = '🎤 Voice message'
+             } else if (lastMessage.messageType === 'emoji') {
+               previewContent = content // Keep emoji as-is
+             }
+             
+             return { ...conv, lastMessage: { ...lastMessage, content: previewContent } }
            } catch (err) {
              console.warn('Conversation preview decrypt failed:', err)
              return { ...conv, lastMessage: { ...lastMessage, content: '[encrypted message]' } }
@@ -143,13 +152,13 @@ export default function Chat() {
     /* ─────────────────────────────────────────────────────────
       Send message as encrypted payload
     ───────────────────────────────────────────────────────── */
-  const handleSend = useCallback(async (content) => {
-    if (!selectedUser || !content.trim()) return
+  const handleSend = useCallback(async (content, messageType = 'text', metadata = {}) => {
+    if (!selectedUser || !content?.toString().trim()) return
 
-    const updateRecent = (content) => {
+    const updateRecent = (displayContent) => {
       setRecentChats(prev => {
         const entry   = prev.find(c => c.user._id === selectedUser._id)
-        const newLast = { content, createdAt: new Date().toISOString(), sender: user._id }
+        const newLast = { content: displayContent, createdAt: new Date().toISOString(), sender: user._id, messageType }
         if (entry) {
           return [{ ...entry, lastMessage: newLast }, ...prev.filter(c => c.user._id !== selectedUser._id)]
         }
@@ -161,18 +170,27 @@ export default function Chat() {
       const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
 
       if (socket) {
-        socket.emit('sendMessage', { to: selectedUser._id, ...payload }, (res) => {
+        socket.emit('sendMessage', { 
+          to: selectedUser._id, 
+          ...payload,
+          messageType,
+          voiceDuration: metadata.duration || null,
+        }, (res) => {
           if (res?.success) {
-            setMessages(prev => [...prev, { ...res.message, content }])
-            updateRecent(content)
+            setMessages(prev => [...prev, { ...res.message, content, messageType }])
+            // Display proper preview in sidebar
+            const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
+            updateRecent(sidebarPreview)
           } else {
             console.error('Send failed:', res?.error || 'Unknown socket error')
           }
         })
       } else {
         const { data } = await sendMessage(selectedUser._id, payload)
-        setMessages(prev => [...prev, { ...data.message, content }])
-        updateRecent(content)
+        setMessages(prev => [...prev, { ...data.message, content, messageType }])
+        // Display proper preview in sidebar
+        const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
+        updateRecent(sidebarPreview)
       }
     } catch (err) {
       console.error('Encrypted send failed:', err)
@@ -204,10 +222,20 @@ export default function Chat() {
       // Update sidebar — bump unread count if chat not open
       setRecentChats(prev => {
         const exists   = prev.find(c => c.user._id.toString() === senderId)
+        
+        // Determine preview text based on message type
+        let sidebarPreview = displayMsg.content
+        if (msg.messageType === 'voice') {
+          sidebarPreview = '🎤 Voice message'
+        } else if (msg.messageType === 'emoji') {
+          sidebarPreview = displayMsg.content // Keep emoji as-is
+        }
+        
         const newLast  = {
-          content:   displayMsg.content,
+          content:   sidebarPreview,
           createdAt: msg.createdAt,
           sender:    msg.sender?._id || msg.sender,
+          messageType: msg.messageType,
         }
         if (exists) {
           return [

@@ -41,8 +41,12 @@ const messageSchema = new mongoose.Schema(
     },
     messageType: {
       type: String,
-      enum: ['text'],
+      enum: ['text', 'voice', 'emoji'],
       default: 'text',
+    },
+    voiceDuration: {
+      type: Number,
+      default: null,
     },
   },
   {

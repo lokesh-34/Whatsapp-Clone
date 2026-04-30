@@ -463,6 +463,211 @@ a:hover { text-decoration: underline; }
 .send-btn:active:not(:disabled) { transform: scale(.93); }
 .send-btn:disabled { opacity: .5; }
 
+/* ── Input Actions (Emoji, Voice, Send) ──────────────── */
+.input-actions {
+  display: flex; gap: 8px; align-items: center;
+}
+
+.action-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  color: var(--wa-text-secondary);
+  transition: color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+
+.emoji-btn:hover, .voice-btn:hover {
+  color: var(--wa-green);
+  background: rgba(0, 168, 132, 0.15);
+}
+
+.voice-btn:active {
+  background: rgba(0, 168, 132, 0.25);
+}
+
+.stop-record-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--wa-error);
+  color: white;
+  flex-shrink: 0;
+}
+
+.stop-record-btn:hover {
+  background: #f24a6a;
+}
+
+/* ── Emoji Picker ─────────────────────────────────────── */
+.emoji-picker-wrapper {
+  position: relative;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--wa-teal-header);
+  border: 1px solid var(--wa-divider);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 8px;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  width: 300px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.emoji-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.emoji-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.emoji-item {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 6px;
+  background: var(--wa-input-bg);
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+}
+
+.emoji-item:hover {
+  background: rgba(0, 168, 132, 0.2);
+}
+
+.emoji-input-add {
+  display: flex;
+  gap: 4px;
+}
+
+.emoji-text-input {
+  flex: 1;
+  background: var(--wa-input-bg);
+  border: 1px solid var(--wa-divider);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--wa-text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.emoji-text-input:focus {
+  border-color: var(--wa-green);
+}
+
+.emoji-text-input::placeholder {
+  color: var(--wa-text-secondary);
+}
+
+/* ── Voice Recording Indicator ────────────────────────── */
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  padding: 0 16px;
+}
+
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--wa-error);
+  flex-shrink: 0;
+}
+
+.recording-time {
+  color: var(--wa-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ── Voice Message Bubble ─────────────────────────────── */
+.voice-message-bubble {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  min-width: 200px;
+}
+
+.voice-play-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition);
+}
+
+.voice-play-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.voice-waveform {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.voice-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.voice-progress-fill {
+  height: 100%;
+  background: currentColor;
+  transition: width 0.1s linear;
+}
+
+.voice-duration {
+  font-size: 12px;
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* ── Emoji Message ────────────────────────────────────── */
+.emoji-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
 /* ═══════════════════════════════════════════════════════
    RESPONSIVE — Mobile
 ═══════════════════════════════════════════════════════ */

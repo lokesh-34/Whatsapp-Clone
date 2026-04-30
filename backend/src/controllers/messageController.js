@@ -62,6 +62,8 @@ const getConversations = async (req, res, next) => {
             createdAt: '$lastMessage.createdAt',
             sender: '$lastMessage.sender',
             read: '$lastMessage.read',
+            messageType: '$lastMessage.messageType',
+            voiceDuration: '$lastMessage.voiceDuration',
           },
           unreadCount: 1,
         },
@@ -114,7 +116,7 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: errors.array()[0].msg })
 
     const { userId }  = req.params
-    const { encryptedMessage, iv, encryptedKey } = req.body
+    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null } = req.body
     const senderId    = req.user._id
 
     if (userId === senderId.toString())
@@ -132,6 +134,8 @@ const sendMessage = async (req, res, next) => {
       encryptedMessage,
       iv,
       encryptedKey: encryptedKey || null,
+      messageType,
+      voiceDuration: messageType === 'voice' ? voiceDuration : null,
     })
 
     await message.populate('sender',   'username avatarColor avatar')

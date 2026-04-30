@@ -1,12 +1,99 @@
 import { motion } from 'framer-motion'
+import { Play, Pause } from 'lucide-react'
+import { useState, useRef } from 'react'
 
 export default function MessageBubble({ message, isMine }) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackTime, setPlaybackTime] = useState(0)
+  const audioRef = useRef(null)
+
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit', minute: '2-digit',
   })
 
   const isRead = Boolean(message.readAt || message.read)
   const isDelivered = Boolean(message.deliveredAt || isRead)
+
+  // Format duration
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const handlePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause()
+      } else {
+        audioRef.current.play()
+      }
+      setIsPlaying(!isPlaying)
+    }
+  }
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setPlaybackTime(audioRef.current.currentTime)
+    }
+  }
+
+  const handleEnded = () => {
+    setIsPlaying(false)
+    setPlaybackTime(0)
+  }
+
+  // Determine message type and render accordingly
+  const renderContent = () => {
+    if (message.messageType === 'voice') {
+      const duration = message.voiceDuration || 0
+      return (
+        <div className="voice-message-bubble">
+          <button
+            className="voice-play-btn"
+            onClick={handlePlayPause}
+            title={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? (
+              <Pause size={20} fill="currentColor" />
+            ) : (
+              <Play size={20} fill="currentColor" />
+            )}
+          </button>
+          <div className="voice-waveform">
+            <div className="voice-progress-bar">
+              <div
+                className="voice-progress-fill"
+                style={{
+                  width: `${duration > 0 ? (playbackTime / duration) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <span className="voice-duration">{formatDuration(duration)}</span>
+          </div>
+          <audio
+            ref={audioRef}
+            src={message.content}
+            onTimeUpdate={handleTimeUpdate}
+            onEnded={handleEnded}
+            style={{ display: 'none' }}
+          />
+        </div>
+      )
+    }
+
+    if (message.messageType === 'emoji') {
+      return (
+        <span className="emoji-message" style={{ fontSize: '48px' }}>
+          {message.content}
+        </span>
+      )
+    }
+
+    // Default text message
+    return <span className="bubble-text">{message.content}</span>
+  }
 
   return (
     <motion.div
@@ -17,7 +104,7 @@ export default function MessageBubble({ message, isMine }) {
       layout
     >
       <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`}>
-        <span className="bubble-text">{message.content}</span>
+        {renderContent()}
         <span className="bubble-meta">
           <span className="bubble-time">{time}</span>
           {isMine && (
