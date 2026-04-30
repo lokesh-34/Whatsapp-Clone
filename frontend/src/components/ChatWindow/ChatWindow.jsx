@@ -9,7 +9,7 @@ import SpotlightCard from '../bits/SpotlightCard'
 import GradientText from '../bits/GradientText'
 import ShinyText from '../bits/ShinyText'
 
-export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, isOnline, isTyping }) {
+export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, isOnline, isTyping, onBack }) {
   const emptyRef = useRef(null)
 
   useEffect(() => {
@@ -64,6 +64,26 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
       >
+        <button
+          onClick={onBack}
+          style={{
+            display: 'none',
+            background: 'none',
+            border: 'none',
+            color: 'var(--wa-text-primary)',
+            fontSize: 24,
+            cursor: 'pointer',
+            padding: '8px',
+            borderRadius: '50%',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,.08)'}
+          onMouseLeave={(e) => e.target.style.background = 'none'}
+          title="Back"
+          className="chat-header-back"
+        >
+          ←
+        </button>
         <div className="chat-header-avatar-wrap">
           <Avatar style={{ background: selectedUser.avatarColor, width: 44, height: 44 }}>
             <AvatarFallback style={{ background: selectedUser.avatarColor, color: '#fff', fontSize: 18, fontWeight: 700 }}>

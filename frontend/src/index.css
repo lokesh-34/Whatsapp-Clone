@@ -473,6 +473,7 @@ a:hover { text-decoration: underline; }
   .chat-page.chat-open .chat-window { display: flex; width: 100%; }
   .message-list { padding: 12px 4%; }
   .bubble { max-width: 85%; }
+  .chat-header-back { display: flex !important; }
 }
 
 /* ═══════════════════════════════════════════════════════

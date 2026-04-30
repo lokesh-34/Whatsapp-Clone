@@ -1,19 +1,143 @@
-import { motion } from 'framer-motion'
+import { useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import gsap from 'gsap'
 import { Avatar, AvatarFallback } from '../ui/avatar'
-import SpotlightCard from '../bits/SpotlightCard'
-import ShinyText from '../bits/ShinyText'
-import UserItem from './UserItem'
+import ShinyText    from '../bits/ShinyText'
 import GradientText from '../bits/GradientText'
 
-const listVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.05 } },
+// ── Icons ────────────────────────────────────────────────────
+const SearchIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+const MiniSpinner = () => (
+  <div style={{
+    width: 15, height: 15, borderRadius: '50%',
+    border: '2px solid rgba(0,168,132,.25)',
+    borderTopColor: '#00A884',
+    animation: 'spin .7s linear infinite',
+    flexShrink: 0,
+  }} />
+)
+
+// ── Conversation item ────────────────────────────────────────
+function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, onClick }) {
+  const { user, lastMessage, unreadCount } = conversation
+
+  const initial = user.username?.[0]?.toUpperCase() || '?'
+  const online  = isOnline(user._id)
+  const preview = lastMessage?.content || ''
+  const time    = lastMessage?.createdAt
+    ? new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : ''
+
+  return (
+    <motion.div
+      onClick={onClick}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+      whileHover={{ background: 'rgba(255,255,255,.04)' }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 16px', cursor: 'pointer', borderRadius: 8,
+        background: isSelected ? 'rgba(0,168,132,.12)' : isHighlighted ? 'rgba(0,168,132,.06)' : 'transparent',
+        borderLeft: isSelected ? '3px solid #00A884' : isHighlighted ? '3px solid #00A884' : '3px solid transparent',
+        boxShadow: isHighlighted && !isSelected ? 'inset 0 0 8px rgba(0,168,132,.1)' : 'none',
+        transition: 'background .15s, border-color .15s, box-shadow .15s',
+      }}
+    >
+      {/* Avatar with online dot */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <Avatar style={{ width: 42, height: 42, background: user.avatarColor }}>
+          <AvatarFallback style={{ background: user.avatarColor, color: '#fff', fontWeight: 700, fontSize: 16 }}>
+            {user.avatar
+              ? <img src={user.avatar} alt={initial} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              : initial
+            }
+          </AvatarFallback>
+        </Avatar>
+        {online && (
+          <div style={{
+            position: 'absolute', bottom: 1, right: 1,
+            width: 10, height: 10, borderRadius: '50%',
+            background: '#00A884', border: '2px solid #111B21',
+          }} />
+        )}
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 600, fontSize: 14, color: '#E9EDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user.username}
+          </span>
+          {time && (
+            <span style={{ fontSize: 11, color: unreadCount > 0 ? '#00A884' : '#8696A0', flexShrink: 0, marginLeft: 6 }}>
+              {time}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+          <span style={{ fontSize: 12.5, color: '#8696A0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {preview || <em style={{ color: '#667781' }}>No messages yet</em>}
+          </span>
+          {unreadCount > 0 && (
+            <span style={{
+              background: '#00A884', color: '#fff', borderRadius: '50%',
+              minWidth: 18, height: 18, fontSize: 11, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginLeft: 8, flexShrink: 0, padding: '0 4px',
+            }}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
 }
 
+// ── Empty states ─────────────────────────────────────────────
+function EmptyState({ isSearchMode, searchLoading, query }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) gsap.fromTo(ref.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35 })
+  }, [isSearchMode, query])
+
+  if (searchLoading) return (
+    <div className="sidebar-empty" ref={ref}>
+      <MiniSpinner />
+      <p style={{ marginTop: 12, fontSize: 13 }}>Searching…</p>
+    </div>
+  )
+  if (isSearchMode && query) return (
+    <div className="sidebar-empty" ref={ref}>
+      <div style={{ fontSize: 30, marginBottom: 10 }}>🔍</div>
+      <p style={{ fontWeight: 600, color: 'var(--wa-text-primary)', fontSize: 14, marginBottom: 4 }}>No users found</p>
+      <p style={{ fontSize: 13 }}>Try a different username or email</p>
+    </div>
+  )
+  return (
+    <div className="sidebar-empty" ref={ref} style={{ padding: '40px 20px' }}>
+      <motion.div style={{ fontSize: 38, marginBottom: 14 }}
+        animate={{ y: [0, -8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>🔍</motion.div>
+      <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--wa-text-primary)', marginBottom: 8 }}>Find someone to chat with</p>
+      <p style={{ fontSize: 13, color: 'var(--wa-text-muted)', lineHeight: 1.6 }}>
+        Search by <strong style={{ color: 'var(--wa-text-secondary)' }}>username</strong> or{' '}
+        <strong style={{ color: 'var(--wa-text-secondary)' }}>email</strong>
+      </p>
+    </div>
+  )
+}
+
+// ── Main Sidebar ─────────────────────────────────────────────
 export default function Sidebar({
-  currentUser, users, selectedUser, onSelectUser,
-  onLogout, isOnline, unreadMap, searchQuery, onSearch,
-}) {
+  currentUser, conversations, selectedUser, onSelectUser,
+  onLogout, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
+  const showEmpty = conversations.length === 0
+
   return (
     <aside className="sidebar">
       {/* Header */}
@@ -21,23 +145,19 @@ export default function Sidebar({
         <div className="sidebar-header-left">
           <Avatar style={{ background: currentUser?.avatarColor, width: 36, height: 36 }}>
             <AvatarFallback style={{ background: currentUser?.avatarColor, color: '#fff', fontSize: 14, fontWeight: 700 }}>
-              {currentUser?.username?.[0]?.toUpperCase()}
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                : currentUser?.username?.[0]?.toUpperCase()
+              }
             </AvatarFallback>
           </Avatar>
           <span className="sidebar-username">
-            <ShinyText
-              text={currentUser?.username || ''}
-              color="#E9EDEF"
-              shineColor="#ffffff"
-              speed={6}
-            />
+            <ShinyText text={currentUser?.username || ''} color="#E9EDEF" shineColor="#fff" speed={6} />
           </span>
         </div>
-        <motion.button
-          id="logout-btn" className="icon-btn" onClick={onLogout} title="Logout"
-          whileHover={{ scale: 1.15, rotate: 12 }} whileTap={{ scale: 0.88 }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <motion.button id="logout-btn" className="icon-btn" onClick={onLogout} title="Logout"
+          whileHover={{ scale: 1.15, rotate: 12 }} whileTap={{ scale: 0.88 }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
@@ -45,45 +165,73 @@ export default function Sidebar({
         </motion.button>
       </div>
 
-      {/* Search */}
+      {/* Search bar */}
       <div className="sidebar-search">
-        <div className="search-wrap">
-          <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
+        <motion.div
+          className="search-wrap"
+          animate={{ boxShadow: searchQuery ? '0 0 0 1.5px rgba(0,168,132,0.5)' : '0 0 0 0px transparent' }}
+          transition={{ duration: 0.2 }}
+        >
+          <span className="search-icon">{searchLoading ? <MiniSpinner /> : <SearchIcon />}</span>
           <input
-            id="user-search" type="text" placeholder="Search or start new chat"
-            value={searchQuery} onChange={(e) => onSearch(e.target.value)} className="search-input"
+            id="user-search" type="text" className="search-input"
+            placeholder="Search by username or email…"
+            value={searchQuery} onChange={e => onSearch(e.target.value)}
+            autoComplete="off" spellCheck={false}
           />
-        </div>
+          <AnimatePresence>
+            {searchQuery && (
+              <motion.button key="clear"
+                initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 0.15 }}
+                onClick={() => onSearch('')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8696A0', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                title="Clear"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
 
       {/* Section label */}
-      {users.length > 0 && (
-        <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          <GradientText colors={['#8696A0', '#00A884', '#8696A0']} animationSpeed={12}>
-            Contacts
-          </GradientText>
-        </div>
-      )}
-
-      {/* User List */}
-      <div className="sidebar-list">
-        {users.length === 0 ? (
-          <div className="sidebar-empty"><p>No users found</p></div>
-        ) : (
-          <motion.div variants={listVariants} initial="hidden" animate="visible">
-            {users.map((u) => (
-              <UserItem
-                key={u._id} user={u}
-                isSelected={selectedUser?._id === u._id}
-                isOnline={isOnline(u._id)}
-                unreadCount={unreadMap[u._id] || 0}
-                onClick={() => onSelectUser(u)}
-              />
-            ))}
+      <AnimatePresence mode="wait">
+        {!showEmpty && (
+          <motion.div key={isSearchMode ? 'res' : 'rec'}
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ padding: '6px 16px 2px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}
+          >
+            <GradientText colors={['#8696A0', '#00A884', '#8696A0']} animationSpeed={14}>
+              {isSearchMode ? `Results (${conversations.length})` : 'Recent Chats'}
+            </GradientText>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* List */}
+      <div className="sidebar-list">
+        <AnimatePresence mode="wait">
+          {showEmpty
+            ? <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <EmptyState isSearchMode={isSearchMode} searchLoading={searchLoading} query={searchQuery} />
+              </motion.div>
+            : <motion.div key="list">
+                {conversations.map((conv, idx) => (
+                  <ConversationItem
+                    key={conv.user._id}
+                    conversation={conv}
+                    isSelected={selectedUser?._id === conv.user._id}
+                    isHighlighted={idx === highlightedIndex}
+                    isOnline={isOnline}
+                    onClick={() => onSelectUser(conv.user)}
+                  />
+                ))}
+              </motion.div>
+          }
+        </AnimatePresence>
       </div>
     </aside>
   )

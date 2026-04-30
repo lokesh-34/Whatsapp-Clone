@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
 const messageSchema = new mongoose.Schema(
   {
@@ -12,11 +12,28 @@ const messageSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'Receiver is required'],
     },
-    content: {
+    // Encrypted content (server never stores plaintext)
+    encryptedMessage: {
       type: String,
-      required: [true, 'Message content is required'],
-      trim: true,
-      maxlength: [2000, 'Message cannot exceed 2000 characters'],
+      required: [true, 'Encrypted message is required'],
+    },
+    // AES-GCM IV used for message decryption
+    iv: {
+      type: String,
+      required: true,
+    },
+    // Encrypted AES key for the receiver (RSA-OAEP wrapped)
+    encryptedKey: {
+      type: String,
+      default: null,
+    },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+    readAt: {
+      type: Date,
+      default: null,
     },
     read: {
       type: Boolean,
@@ -31,11 +48,11 @@ const messageSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
-);
+)
 
-// Index for fast conversation queries
-messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
-messageSchema.index({ receiver: 1, read: 1 });
+// Indexes for fast conversation and unread queries
+messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 })
+messageSchema.index({ receiver: 1, read: 1 })
 
-const Message = mongoose.model('Message', messageSchema);
-module.exports = Message;
+const Message = mongoose.model('Message', messageSchema)
+module.exports = Message

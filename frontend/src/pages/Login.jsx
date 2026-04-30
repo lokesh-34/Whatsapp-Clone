@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
 import { loginUser } from '../api'
 import { useAuth } from '../context/AuthContext'
-import Aurora       from '../components/bits/Aurora'
-import SpotlightCard from '../components/bits/SpotlightCard'
-import StarBorder   from '../components/bits/StarBorder'
-import ShinyText    from '../components/bits/ShinyText'
-import GradientText from '../components/bits/GradientText'
+import Aurora          from '../components/bits/Aurora'
+import SpotlightCard   from '../components/bits/SpotlightCard'
+import StarBorder      from '../components/bits/StarBorder'
+import ShinyText       from '../components/bits/ShinyText'
+import GradientText    from '../components/bits/GradientText'
+import GoogleSignInButton from '../components/auth/GoogleSignInButton'
 
 export default function Login() {
   const navigate        = useNavigate()
@@ -47,31 +48,17 @@ export default function Login() {
 
   return (
     <div className="auth-page" style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* React Bits Aurora WebGL background */}
-      <Aurora
-        colorStops={['#001a13', '#00A884', '#001a13']}
-        amplitude={0.8}
-        blend={0.6}
-        speed={0.6}
-      />
+      <Aurora colorStops={['#001a13', '#00A884', '#001a13']} amplitude={0.8} blend={0.6} speed={0.6} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,20,26,0.72)', backdropFilter: 'blur(2px)', pointerEvents: 'none' }} />
 
-      {/* Overlay for readability */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'rgba(11,20,26,0.72)',
-        backdropFilter: 'blur(2px)', pointerEvents: 'none',
-      }} />
-
-      {/* React Bits StarBorder wraps SpotlightCard */}
       <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440, margin: '0 24px' }}>
         <StarBorder color="#00A884" speed="8s">
-          <SpotlightCard spotlightColor="rgba(0,168,132,0.2)" className="">
+          <SpotlightCard spotlightColor="rgba(0,168,132,0.2)">
             <div style={{ padding: '40px 36px' }}>
 
-              {/* Logo with React Bits GradientText */}
+              {/* Logo */}
               <div className="auth-field auth-logo">
-                <motion.span
-                  className="auth-logo-icon"
+                <motion.span className="auth-logo-icon"
                   animate={{ rotate: [0, -10, 10, 0] }}
                   transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 5 }}
                 >💬</motion.span>
@@ -85,6 +72,19 @@ export default function Login() {
                 </p>
               </div>
 
+              {/* Google Sign-In */}
+              <div className="auth-field" style={{ marginBottom: 4 }}>
+                <GoogleSignInButton label="Continue with Google" />
+              </div>
+
+              {/* Divider */}
+              <div className="auth-field" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0' }}>
+                <div style={{ flex: 1, height: 1, background: '#2A3942' }} />
+                <span style={{ fontSize: 12, color: '#667781', whiteSpace: 'nowrap' }}>or sign in with email</span>
+                <div style={{ flex: 1, height: 1, background: '#2A3942' }} />
+              </div>
+
+              {/* Email/Password form */}
               <form onSubmit={handleSubmit} className="auth-form" id="login-form">
                 <AnimatePresence>
                   {error && (
@@ -109,8 +109,7 @@ export default function Login() {
                     placeholder="••••••••" value={form.password} onChange={handleChange} required />
                 </div>
 
-                <motion.button
-                  id="login-btn" type="submit" className="btn-primary auth-field"
+                <motion.button id="login-btn" type="submit" className="btn-primary auth-field"
                   disabled={loading}
                   whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 30px rgba(0,168,132,0.5)' } : {}}
                   whileTap={!loading ? { scale: 0.96 } : {}}
@@ -119,7 +118,7 @@ export default function Login() {
                 </motion.button>
               </form>
 
-              <p className="auth-switch auth-field">
+              <p className="auth-switch auth-field" style={{ marginTop: 16 }}>
                 Don't have an account?{' '}
                 <Link to="/register" id="go-to-register">Create one</Link>
               </p>

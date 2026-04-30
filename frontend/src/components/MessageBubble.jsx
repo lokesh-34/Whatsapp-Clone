@@ -5,6 +5,9 @@ export default function MessageBubble({ message, isMine }) {
     hour: '2-digit', minute: '2-digit',
   })
 
+  const isRead = Boolean(message.readAt || message.read)
+  const isDelivered = Boolean(message.deliveredAt || isRead)
+
   return (
     <motion.div
       className={`bubble-row ${isMine ? 'bubble-row--mine' : 'bubble-row--theirs'}`}
@@ -18,9 +21,14 @@ export default function MessageBubble({ message, isMine }) {
         <span className="bubble-meta">
           <span className="bubble-time">{time}</span>
           {isMine && (
-            <span className="bubble-tick" title={message.read ? 'Read' : 'Delivered'}>
-              {message.read ? (
+            <span className="bubble-tick" title={isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
+              {isRead ? (
                 <svg width="16" height="11" viewBox="0 0 16 11" fill="#53bdeb">
+                  <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                  <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
+                </svg>
+              ) : isDelivered ? (
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="#8696A0">
                   <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
                   <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
                 </svg>
