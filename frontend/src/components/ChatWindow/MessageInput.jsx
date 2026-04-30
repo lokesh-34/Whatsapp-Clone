@@ -1,13 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSocket } from '../../context/SocketContext'
-import { Send, Smile, Mic, Square } from 'lucide-react'
+import { Send, Smile, Mic, Square, Clock } from 'lucide-react'
 import { voiceRecorder } from '../../lib/voiceRecorder'
+
+const getDefaultScheduleValue = () => {
+  const date = new Date(Date.now() + 15 * 60 * 1000)
+  const offset = date.getTimezoneOffset()
+  const local = new Date(date.getTime() - offset * 60 * 1000)
+  return local.toISOString().slice(0, 16)
+}
 
 export default function MessageInput({ onSend, selectedUser }) {
   const [text, setText]            = useState('')
   const [typing, setTyping]        = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false)
+  const [scheduledFor, setScheduledFor]       = useState(getDefaultScheduleValue())
   const [isRecording, setIsRecording]         = useState(false)
   const [recordingTime, setRecordingTime]     = useState(0)
   const { socket }                 = useSocket()
@@ -64,11 +73,19 @@ export default function MessageInput({ onSend, selectedUser }) {
     onSend(content, messageType, metadata)
     setText('')
     setShowEmojiPicker(false)
+    setShowSchedulePicker(false)
     clearTimeout(typingTimer.current)
     if (typing && socket && selectedUser) {
       setTyping(false)
       socket.emit('stopTyping', { to: selectedUser._id })
     }
+  }
+
+  const handleScheduleSend = () => {
+    if (!text.trim()) return
+    const scheduledDate = new Date(scheduledFor)
+    if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) return
+    handleSend(text, 'text', { scheduledFor: scheduledDate.toISOString() })
   }
 
   const handleKeyDown = (e) => {
@@ -189,15 +206,61 @@ export default function MessageInput({ onSend, selectedUser }) {
 
           <div className="input-actions">
             {hasText ? (
-              <motion.button
-                id="send-btn"
-                className="action-btn send-btn send-btn--active"
-                onClick={() => handleSend(text)}
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.88, rotate: 15 }}
-              >
-                <Send size={18} />
-              </motion.button>
+              <>
+                <div className="schedule-wrap">
+                  <motion.button
+                    className="action-btn schedule-btn"
+                    onClick={() => {
+                      setScheduledFor(getDefaultScheduleValue())
+                      setShowSchedulePicker(prev => !prev)
+                    }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    title="Schedule message"
+                  >
+                    <Clock size={18} />
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {showSchedulePicker && (
+                      <motion.div
+                        className="schedule-popover"
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <label className="schedule-label" htmlFor="schedule-time">Send later</label>
+                        <input
+                          id="schedule-time"
+                          type="datetime-local"
+                          className="schedule-input"
+                          value={scheduledFor}
+                          onChange={(e) => setScheduledFor(e.target.value)}
+                        />
+                        <div className="schedule-actions">
+                          <button className="schedule-cancel" onClick={() => setShowSchedulePicker(false)} type="button">
+                            Cancel
+                          </button>
+                          <button className="schedule-confirm" onClick={handleScheduleSend} type="button">
+                            Schedule
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <motion.button
+                  id="send-btn"
+                  className="action-btn send-btn send-btn--active"
+                  onClick={() => handleSend(text)}
+                  whileHover={{ scale: 1.12 }}
+                  whileTap={{ scale: 0.88, rotate: 15 }}
+                >
+                  <Send size={18} />
+                </motion.button>
+              </>
             ) : (
               <motion.button
                 className="action-btn voice-btn"

@@ -33,8 +33,12 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
   const isMine = Boolean(myId && senderId && senderId === myId)
   const isRead = Boolean(lastMessage?.readAt || lastMessage?.read)
   const isDelivered = Boolean(lastMessage?.deliveredAt || isRead)
+  const isScheduled = lastMessage?.scheduledStatus === 'scheduled'
   const time    = lastMessage?.createdAt
-    ? new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? new Date(lastMessage.sentAt || lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : ''
+  const scheduledTime = lastMessage?.scheduledFor
+    ? new Date(lastMessage.scheduledFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : ''
 
   return (
@@ -78,17 +82,22 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
           <span style={{ fontWeight: 600, fontSize: 14, color: '#E9EDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {user.username}
           </span>
-          {time && (
+          {(time || scheduledTime) && (
             <span style={{ fontSize: 11, color: unreadCount > 0 ? '#00A884' : '#8696A0', flexShrink: 0, marginLeft: 6 }}>
-              {time}
+              {isScheduled ? scheduledTime : time}
             </span>
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
             {isMine && lastMessage && (
-              <span title={isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                {isRead ? (
+              <span title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                {isScheduled ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696A0" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" />
+                  </svg>
+                ) : isRead ? (
                   <svg width="14" height="10" viewBox="0 0 16 11" fill="#53bdeb">
                     <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z" />
                     <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z" />

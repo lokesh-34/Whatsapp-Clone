@@ -39,6 +39,19 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    scheduledFor: {
+      type: Date,
+      default: null,
+    },
+    scheduledStatus: {
+      type: String,
+      enum: ['sent', 'scheduled'],
+      default: 'sent',
+    },
+    sentAt: {
+      type: Date,
+      default: null,
+    },
     messageType: {
       type: String,
       enum: ['text', 'voice', 'emoji'],
@@ -57,6 +70,7 @@ const messageSchema = new mongoose.Schema(
 // Indexes for fast conversation and unread queries
 messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 })
 messageSchema.index({ receiver: 1, read: 1 })
+messageSchema.index({ scheduledStatus: 1, scheduledFor: 1 })
 
 const Message = mongoose.model('Message', messageSchema)
 module.exports = Message

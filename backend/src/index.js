@@ -13,6 +13,7 @@ const messageRoutes = require('./routes/messages');
 
 // Socket handler
 const socketHandler = require('./socket/socketHandler');
+const { startScheduledMessageWorker } = require('./services/scheduledMessageService');
 
 // ─── App Setup ───────────────────────────────────────────────────────────────
 const app = express();
@@ -66,6 +67,7 @@ app.use(errorHandler);
 
 // ─── Socket.IO Handler ───────────────────────────────────────────────────────
 socketHandler(io);
+startScheduledMessageWorker(io);
 
 // ─── Start Server ────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;

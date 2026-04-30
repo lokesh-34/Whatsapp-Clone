@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Play, Pause } from 'lucide-react'
+import { Play, Pause, Clock } from 'lucide-react'
 import { useState, useRef } from 'react'
 
 export default function MessageBubble({ message, isMine }) {
@@ -7,12 +7,14 @@ export default function MessageBubble({ message, isMine }) {
   const [playbackTime, setPlaybackTime] = useState(0)
   const audioRef = useRef(null)
 
-  const time = new Date(message.createdAt).toLocaleTimeString([], {
+  const timeSource = message.sentAt || message.createdAt
+  const time = new Date(timeSource).toLocaleTimeString([], {
     hour: '2-digit', minute: '2-digit',
   })
 
   const isRead = Boolean(message.readAt || message.read)
   const isDelivered = Boolean(message.deliveredAt || isRead)
+  const isScheduled = message.scheduledStatus === 'scheduled'
 
   // Format duration
   const formatDuration = (seconds) => {
@@ -46,6 +48,22 @@ export default function MessageBubble({ message, isMine }) {
 
   // Determine message type and render accordingly
   const renderContent = () => {
+    if (isScheduled) {
+      const scheduledTime = message.scheduledFor
+        ? new Date(message.scheduledFor).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+        : 'soon'
+
+      return (
+        <div className="scheduled-message-bubble">
+          <Clock size={18} />
+          <div className="scheduled-message-content">
+            <span className="scheduled-message-title">Scheduled message</span>
+            <span className="scheduled-message-time">Sending at {scheduledTime}</span>
+          </div>
+        </div>
+      )
+    }
+
     if (message.messageType === 'voice') {
       const duration = message.voiceDuration || 0
       return (
@@ -108,8 +126,10 @@ export default function MessageBubble({ message, isMine }) {
         <span className="bubble-meta">
           <span className="bubble-time">{time}</span>
           {isMine && (
-            <span className="bubble-tick" title={isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
-              {isRead ? (
+            <span className="bubble-tick" title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
+              {isScheduled ? (
+                <Clock size={14} strokeWidth={2.2} />
+              ) : isRead ? (
                 <svg width="16" height="11" viewBox="0 0 16 11" fill="#53bdeb">
                   <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
                   <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>

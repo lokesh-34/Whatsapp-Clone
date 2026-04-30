@@ -60,6 +60,9 @@ const getConversations = async (req, res, next) => {
             deliveredAt: '$lastMessage.deliveredAt',
             readAt: '$lastMessage.readAt',
             createdAt: '$lastMessage.createdAt',
+            sentAt: '$lastMessage.sentAt',
+            scheduledFor: '$lastMessage.scheduledFor',
+            scheduledStatus: '$lastMessage.scheduledStatus',
             sender: '$lastMessage.sender',
             read: '$lastMessage.read',
             messageType: '$lastMessage.messageType',
@@ -116,7 +119,7 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: errors.array()[0].msg })
 
     const { userId }  = req.params
-    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null } = req.body
+    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null } = req.body
     const senderId    = req.user._id
 
     if (userId === senderId.toString())
@@ -128,6 +131,9 @@ const sendMessage = async (req, res, next) => {
     if (!encryptedMessage)
       return res.status(400).json({ success: false, message: 'Encrypted message is required.' })
 
+    const scheduledDate = scheduledFor ? new Date(scheduledFor) : null
+    const isScheduled = scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now()
+
     const message = await Message.create({
       sender:   senderId,
       receiver: userId,
@@ -136,12 +142,17 @@ const sendMessage = async (req, res, next) => {
       encryptedKey: encryptedKey || null,
       messageType,
       voiceDuration: messageType === 'voice' ? voiceDuration : null,
+      scheduledFor: isScheduled ? scheduledDate : null,
+      scheduledStatus: isScheduled ? 'scheduled' : 'sent',
+      sentAt: isScheduled ? null : new Date(),
     })
 
     await message.populate('sender',   'username avatarColor avatar')
     await message.populate('receiver', 'username avatarColor avatar')
 
-    await sendPushNotification({ receiver, sender: message.sender, message })
+    if (!isScheduled) {
+      await sendPushNotification({ receiver, sender: message.sender, message })
+    }
 
     const messageObj = message.toObject()
 

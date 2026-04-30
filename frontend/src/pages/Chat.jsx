@@ -164,6 +164,9 @@ export default function Chat() {
           createdAt: messageData?.createdAt || new Date().toISOString(),
           sender: user._id,
           messageType,
+          scheduledFor: messageData?.scheduledFor || metadata.scheduledFor || null,
+          scheduledStatus: messageData?.scheduledStatus || (metadata.scheduledFor ? 'scheduled' : 'sent'),
+          sentAt: messageData?.sentAt || null,
         }
         if (entry) {
           return [{ ...entry, lastMessage: newLast }, ...prev.filter(c => c.user._id !== selectedUser._id)]
@@ -181,11 +184,11 @@ export default function Chat() {
           ...payload,
           messageType,
           voiceDuration: metadata.duration || null,
+          scheduledFor: metadata.scheduledFor || null,
         }, (res) => {
           if (res?.success) {
             const sentMessage = { ...res.message, content, messageType }
             setMessages(prev => [...prev, sentMessage])
-            // Display proper preview in sidebar
             const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
             updateRecent(sentMessage, sidebarPreview)
           } else {
@@ -193,10 +196,9 @@ export default function Chat() {
           }
         })
       } else {
-        const { data } = await sendMessage(selectedUser._id, payload)
+        const { data } = await sendMessage(selectedUser._id, { ...payload, scheduledFor: metadata.scheduledFor || null })
         const sentMessage = { ...data.message, content, messageType }
         setMessages(prev => [...prev, sentMessage])
-        // Display proper preview in sidebar
         const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
         updateRecent(sentMessage, sidebarPreview)
       }
@@ -259,7 +261,7 @@ export default function Chat() {
       })
     }
 
-    const handleMessageStatusUpdated = ({ messageId, senderId, receiverId, deliveredAt, readAt, read }) => {
+    const handleMessageStatusUpdated = ({ messageId, senderId, receiverId, deliveredAt, readAt, read, scheduledStatus, sentAt, scheduledFor }) => {
       if (!messageId) return
 
       setMessages(prev => prev.map((msg) => {
@@ -269,6 +271,9 @@ export default function Chat() {
           deliveredAt: deliveredAt || msg.deliveredAt || null,
           readAt: readAt || msg.readAt || null,
           read: typeof read === 'boolean' ? read : (msg.read || !!readAt),
+          scheduledStatus: scheduledStatus || msg.scheduledStatus || 'sent',
+          sentAt: sentAt || msg.sentAt || null,
+          scheduledFor: scheduledFor || msg.scheduledFor || null,
         }
       }))
 
@@ -287,6 +292,9 @@ export default function Chat() {
             deliveredAt: deliveredAt || conv.lastMessage?.deliveredAt || null,
             readAt: readAt || conv.lastMessage?.readAt || null,
             read: typeof read === 'boolean' ? read : (conv.lastMessage?.read || !!readAt),
+            scheduledStatus: scheduledStatus || conv.lastMessage?.scheduledStatus || 'sent',
+            sentAt: sentAt || conv.lastMessage?.sentAt || null,
+            scheduledFor: scheduledFor || conv.lastMessage?.scheduledFor || null,
           },
         }
       }))

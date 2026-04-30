@@ -54,7 +54,7 @@ const socketHandler = (io) => {
     // ── sendMessage ─────────────────────────────────────────
     socket.on('sendMessage', async (data, callback) => {
       try {
-        const { to, encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null } = data
+        const { to, encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null } = data
 
         if (!to || !encryptedMessage) {
           return callback?.({ success: false, error: 'Invalid message data.' })
@@ -68,6 +68,9 @@ const socketHandler = (io) => {
           return callback?.({ success: false, error: 'Recipient not found.' })
         }
 
+        const scheduledDate = scheduledFor ? new Date(scheduledFor) : null
+        const isScheduled = scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now()
+
         // Save to DB — use content field for plaintext, keep legacy fields if present
         const message = await Message.create({
           sender:   userId,
@@ -77,26 +80,33 @@ const socketHandler = (io) => {
           encryptedKey: encryptedKey || null,
           messageType,
           voiceDuration: messageType === 'voice' ? voiceDuration : null,
+          scheduledFor: isScheduled ? scheduledDate : null,
+          scheduledStatus: isScheduled ? 'scheduled' : 'sent',
+          sentAt: isScheduled ? null : new Date(),
         })
 
         await message.populate('sender',   'username avatarColor')
         await message.populate('receiver', 'username avatarColor')
 
         const receiverOnline = getSocketIds(to).size > 0
-        if (receiverOnline) {
+        if (!isScheduled && receiverOnline) {
           message.deliveredAt = new Date()
           await message.save()
         }
 
         const messageObj = message.toObject()
 
-        await sendPushNotification({ receiver, sender: message.sender, message: messageObj })
+        if (!isScheduled) {
+          await sendPushNotification({ receiver, sender: message.sender, message: messageObj })
+        }
 
-        // Deliver to receiver's room
-        socket.to(to).emit('newMessage', messageObj)
+        // Deliver to receiver's room immediately only for non-scheduled messages
+        if (!isScheduled) {
+          socket.to(to).emit('newMessage', messageObj)
 
-        if (receiverOnline) {
-          emitMessageStatus(io, messageObj)
+          if (receiverOnline) {
+            emitMessageStatus(io, messageObj)
+          }
         }
 
         // Acknowledge sender
