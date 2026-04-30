@@ -496,60 +496,97 @@ a:hover { text-decoration: underline; }
   position: absolute;
   bottom: 52px;
   right: 0;
-  width: 260px;
-  background: var(--wa-teal-header);
-  border: 1px solid var(--wa-divider);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  width: 300px;
+  background:
+    linear-gradient(180deg, rgba(32, 44, 51, 0.98) 0%, rgba(17, 27, 33, 0.98) 100%);
+  border: 1px solid rgba(134, 150, 160, 0.16);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
   z-index: 80;
 }
 
 .schedule-label {
   display: block;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   color: var(--wa-text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .schedule-input {
   width: 100%;
-  background: var(--wa-input-bg);
-  border: 1px solid var(--wa-divider);
-  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(42, 57, 66, 0.96) 0%, rgba(32, 44, 51, 0.96) 100%);
+  border: 1px solid rgba(134, 150, 160, 0.14);
+  border-radius: 14px;
   color: var(--wa-text-primary);
-  padding: 8px 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
   outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition), background var(--transition);
+  color-scheme: dark;
 }
 
 .schedule-input::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.75;
+  filter: invert(1) brightness(1.15);
+}
+
+.schedule-input:hover {
+  border-color: rgba(0, 168, 132, 0.45);
+}
+
+.schedule-input:focus {
+  border-color: rgba(0, 168, 132, 0.85);
+  box-shadow: 0 0 0 4px rgba(0, 168, 132, 0.18);
+  transform: translateY(-1px);
 }
 
 .schedule-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .schedule-cancel,
 .schedule-confirm {
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 9px 14px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transition: transform var(--transition), background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.schedule-cancel:hover,
+.schedule-confirm:hover {
+  transform: translateY(-1px);
 }
 
 .schedule-cancel {
-  background: transparent;
+  background: rgba(134, 150, 160, 0.08);
   color: var(--wa-text-secondary);
+  border-color: rgba(134, 150, 160, 0.14);
 }
 
 .schedule-confirm {
-  background: var(--wa-green);
+  background: linear-gradient(180deg, #00b58d 0%, #008069 100%);
   color: #fff;
+  box-shadow: 0 10px 22px rgba(0, 168, 132, 0.24);
+}
+
+.schedule-confirm:hover {
+  box-shadow: 0 12px 26px rgba(0, 168, 132, 0.3);
 }
 
 .scheduled-message-bubble {
