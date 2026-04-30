@@ -28,6 +28,11 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
   const initial = user.username?.[0]?.toUpperCase() || '?'
   const online  = isOnline(user._id)
   const preview = lastMessage?.content || ''
+  const myId = conversation.currentUserId
+  const senderId = (lastMessage?.sender?._id || lastMessage?.sender)?.toString?.()
+  const isMine = Boolean(myId && senderId && senderId === myId)
+  const isRead = Boolean(lastMessage?.readAt || lastMessage?.read)
+  const isDelivered = Boolean(lastMessage?.deliveredAt || isRead)
   const time    = lastMessage?.createdAt
     ? new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : ''
@@ -80,9 +85,30 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
-          <span style={{ fontSize: 12.5, color: '#8696A0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-            {preview || <em style={{ color: '#667781' }}>No messages yet</em>}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+            {isMine && lastMessage && (
+              <span title={isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                {isRead ? (
+                  <svg width="14" height="10" viewBox="0 0 16 11" fill="#53bdeb">
+                    <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z" />
+                    <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z" />
+                  </svg>
+                ) : isDelivered ? (
+                  <svg width="14" height="10" viewBox="0 0 16 11" fill="#8696A0">
+                    <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z" />
+                    <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="10" viewBox="0 0 12 11" fill="#8696A0">
+                    <path d="M10.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z" />
+                  </svg>
+                )}
+              </span>
+            )}
+            <span style={{ fontSize: 12.5, color: '#8696A0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+              {preview || <em style={{ color: '#667781' }}>No messages yet</em>}
+            </span>
+          </div>
           {unreadCount > 0 && (
             <span style={{
               background: '#00A884', color: '#fff', borderRadius: '50%',
@@ -137,6 +163,7 @@ export default function Sidebar({
   currentUser, conversations, selectedUser, onSelectUser,
   onLogout, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
   const showEmpty = conversations.length === 0
+  const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
 
   return (
     <aside className="sidebar">
@@ -222,7 +249,7 @@ export default function Sidebar({
                 {conversations.map((conv, idx) => (
                   <ConversationItem
                     key={conv.user._id}
-                    conversation={conv}
+                    conversation={{ ...conv, currentUserId }}
                     isSelected={selectedUser?._id === conv.user._id}
                     isHighlighted={idx === highlightedIndex}
                     isOnline={isOnline}

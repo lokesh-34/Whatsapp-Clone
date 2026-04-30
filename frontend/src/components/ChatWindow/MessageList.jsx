@@ -4,6 +4,7 @@ import MessageBubble from '../MessageBubble'
 
 export default function MessageList({ messages, currentUser, loading }) {
   const bottomRef = useRef(null)
+  const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -29,7 +30,7 @@ export default function MessageList({ messages, currentUser, loading }) {
             <MessageBubble
               key={msg._id}
               message={msg}
-              isMine={(msg.sender._id || msg.sender) === currentUser._id}
+              isMine={(msg.sender?._id || msg.sender)?.toString?.() === currentUserId}
             />
           ))}
         </AnimatePresence>
