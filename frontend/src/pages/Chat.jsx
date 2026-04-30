@@ -50,7 +50,7 @@ export default function Chat() {
            if (!lastMessage?.encryptedMessage) return conv
 
            try {
-             const content = await e2ee.decryptMessageObject(user._id, lastMessage)
+             const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
              return { ...conv, lastMessage: { ...lastMessage, content } }
            } catch (err) {
              console.warn('Conversation preview decrypt failed:', err)
@@ -100,7 +100,7 @@ export default function Chat() {
         const decrypted = await Promise.all(incoming.map(async (msg) => {
           if (!msg.encryptedMessage) return msg
           try {
-            const content = await e2ee.decryptMessageObject(user._id, msg)
+            const content = await e2ee.decryptMessageObject(user._id, msg, selectedUser._id)
             return { ...msg, content }
           } catch (err) {
             console.warn('Decrypt failed:', err)
@@ -192,7 +192,7 @@ export default function Chat() {
       let displayMsg = msg
       if (msg.encryptedMessage) {
         try {
-          const content = await e2ee.decryptMessageObject(user._id, msg)
+          const content = await e2ee.decryptMessageObject(user._id, msg, senderId)
           displayMsg = { ...msg, content }
         } catch {
           displayMsg = { ...msg, content: '[unable to decrypt]' }

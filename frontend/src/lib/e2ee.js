@@ -198,8 +198,9 @@ export async function encryptForChat(senderId, receiverId, plaintext) {
 }
 
 // High-level decryption for a received message object
-export async function decryptMessageObject(myId, message) {
-  const partnerId = message.sender._id ? message.sender._id : message.sender
+// partnerId should be the other participant in the chat.
+export async function decryptMessageObject(myId, message, partnerIdOverride = null) {
+  const partnerId = partnerIdOverride || (message.sender?._id ? message.sender._id : message.sender)
   const chatId = getChatId(myId, partnerId)
   let aesRaw = getAESForChat(chatId)
 
