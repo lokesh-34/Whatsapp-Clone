@@ -155,10 +155,16 @@ export default function Chat() {
   const handleSend = useCallback(async (content, messageType = 'text', metadata = {}) => {
     if (!selectedUser || !content?.toString().trim()) return
 
-    const updateRecent = (displayContent) => {
+    const updateRecent = (messageData, displayContent) => {
       setRecentChats(prev => {
         const entry   = prev.find(c => c.user._id === selectedUser._id)
-        const newLast = { content: displayContent, createdAt: new Date().toISOString(), sender: user._id, messageType }
+        const newLast = {
+          ...(messageData || {}),
+          content: displayContent,
+          createdAt: messageData?.createdAt || new Date().toISOString(),
+          sender: user._id,
+          messageType,
+        }
         if (entry) {
           return [{ ...entry, lastMessage: newLast }, ...prev.filter(c => c.user._id !== selectedUser._id)]
         }
@@ -177,20 +183,22 @@ export default function Chat() {
           voiceDuration: metadata.duration || null,
         }, (res) => {
           if (res?.success) {
-            setMessages(prev => [...prev, { ...res.message, content, messageType }])
+            const sentMessage = { ...res.message, content, messageType }
+            setMessages(prev => [...prev, sentMessage])
             // Display proper preview in sidebar
             const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
-            updateRecent(sidebarPreview)
+            updateRecent(sentMessage, sidebarPreview)
           } else {
             console.error('Send failed:', res?.error || 'Unknown socket error')
           }
         })
       } else {
         const { data } = await sendMessage(selectedUser._id, payload)
-        setMessages(prev => [...prev, { ...data.message, content, messageType }])
+        const sentMessage = { ...data.message, content, messageType }
+        setMessages(prev => [...prev, sentMessage])
         // Display proper preview in sidebar
         const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
-        updateRecent(sidebarPreview)
+        updateRecent(sentMessage, sidebarPreview)
       }
     } catch (err) {
       console.error('Encrypted send failed:', err)
@@ -251,7 +259,7 @@ export default function Chat() {
       })
     }
 
-    const handleMessageStatusUpdated = ({ messageId, deliveredAt, readAt, read }) => {
+    const handleMessageStatusUpdated = ({ messageId, senderId, receiverId, deliveredAt, readAt, read }) => {
       if (!messageId) return
 
       setMessages(prev => prev.map((msg) => {
@@ -261,6 +269,25 @@ export default function Chat() {
           deliveredAt: deliveredAt || msg.deliveredAt || null,
           readAt: readAt || msg.readAt || null,
           read: typeof read === 'boolean' ? read : (msg.read || !!readAt),
+        }
+      }))
+
+      setRecentChats(prev => prev.map((conv) => {
+        const convUserId = conv.user._id?.toString?.() || conv.user._id
+        const statusUserId = (receiverId || senderId || '').toString()
+        const lastMessageId = conv.lastMessage?._id?.toString?.() || conv.lastMessage?.id
+        const statusMessageId = messageId.toString()
+
+        if (convUserId !== statusUserId || (lastMessageId && lastMessageId !== statusMessageId)) return conv
+
+        return {
+          ...conv,
+          lastMessage: {
+            ...conv.lastMessage,
+            deliveredAt: deliveredAt || conv.lastMessage?.deliveredAt || null,
+            readAt: readAt || conv.lastMessage?.readAt || null,
+            read: typeof read === 'boolean' ? read : (conv.lastMessage?.read || !!readAt),
+          },
         }
       }))
     }
