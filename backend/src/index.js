@@ -15,6 +15,26 @@ const messageRoutes = require('./routes/messages');
 const socketHandler = require('./socket/socketHandler');
 const { startScheduledMessageWorker } = require('./services/scheduledMessageService');
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URLS,
+  'http://localhost:5173',
+  'https://neochatt.netlify.app',
+]
+  .flatMap((value) => (value ? value.split(',') : []))
+  .map((value) => value.trim())
+  .filter(Boolean)
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`))
+  },
+  credentials: true,
+}
+
 // ─── App Setup ───────────────────────────────────────────────────────────────
 const app = express();
 const httpServer = http.createServer(app);
@@ -22,7 +42,7 @@ const httpServer = http.createServer(app);
 // ─── Socket.IO Setup ─────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -35,10 +55,7 @@ setIO(io)
 
 // ─── Middlewares ─────────────────────────────────────────────────────────────
 app.use(
-  cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true,
-  })
+  cors(corsOptions)
 );
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
