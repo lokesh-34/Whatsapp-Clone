@@ -3,8 +3,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
 const connectDB = require('./config/db');
 const errorHandler = require('./middlewares/errorHandler');
+const swaggerSpec = require('./docs/swagger');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -69,6 +71,19 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV,
   });
 });
+
+// ─── API Docs ────────────────────────────────────────────────────────────────
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerSpec)
+})
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  swaggerOptions: {
+    docExpansion: 'none',
+    displayRequestDuration: true,
+  },
+}))
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
