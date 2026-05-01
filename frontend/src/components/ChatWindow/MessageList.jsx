@@ -167,9 +167,37 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   }
 
   const handleArrowClick = (event, message, arrowRect) => {
-    // Open menu positioned below the arrow
-    const x = arrowRect?.left || event.clientX
-    const y = (arrowRect?.bottom || event.clientY) + 4
+    const menuWidth = 210
+    const menuHeight = message?.sender?._id?.toString?.() === currentUserId ? 206 : 164
+    const margin = 12
+    const triggerLeft = arrowRect?.left || event.clientX
+    const triggerRight = arrowRect?.right || event.clientX
+    const triggerBottom = arrowRect?.bottom || event.clientY
+    const triggerTop = arrowRect?.top || event.clientY
+
+    // prefer opening to the right of the trigger
+    const rawX = triggerRight + 8
+    const rawY = triggerBottom + 8
+
+    const maxX = window.innerWidth - menuWidth - margin
+    const maxY = window.innerHeight - menuHeight - margin
+
+    let x = Math.min(rawX, maxX)
+    let y = rawY
+
+    if (rawY > maxY) {
+      y = Math.max(margin, triggerTop - menuHeight - 8)
+    }
+
+    // If there's not enough space on the right, flip the menu to the left of the trigger
+    if (rawX > maxX) {
+      const leftX = triggerLeft - menuWidth - 8
+      x = leftX < margin ? margin : leftX
+    }
+
+    if (x < margin) x = margin
+    if (y < margin) y = margin
+
     setMenuState({ open: true, x, y, message })
   }
 
@@ -240,6 +268,7 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
               onMenuClick={handleArrowClick}
               isPinned={Boolean(msg.pinnedBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
               isStarred={Boolean(msg.starredBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
+              menuActive={menuState.message?._id === msg._id && menuState.open}
             />
           ))}
         </AnimatePresence>

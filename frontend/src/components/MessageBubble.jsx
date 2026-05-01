@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Play, Pause, Clock, Edit, Maximize2, Download, Save, Share2, Pin, Star, ChevronDown } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia, onForwardRequest, onContextMenu, onMenuClick, isPinned = false, isStarred = false }) {
+export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia, onForwardRequest, onContextMenu, onMenuClick, isPinned = false, isStarred = false, menuActive = false }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
@@ -175,19 +175,53 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
     if (message.messageType === 'photo' || message.messageType === 'camera') {
       const fileName = getAttachmentName('photo')
       return (
-        <div className="attachment-message attachment-message--photo">
-          <div className="attachment-media-wrap">
-            <img src={message.content} alt="Shared attachment" className="attachment-photo" loading="lazy" />
-            <div className="attachment-actions">
-              <button className="attachment-action-btn" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
-                <Maximize2 size={14} />
-              </button>
-              <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, fileName)}>
-                <Download size={14} />
-              </button>
-              <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, fileName)}>
-                <Save size={14} />
-              </button>
+        <div className="attachment-message attachment-message--photo attachment-message--whatsapp">
+          <div className="attachment-media-wrap attachment-media-wrap--photo">
+            <img src={message.content} alt="Shared attachment" className="attachment-photo attachment-photo--whatsapp" loading="lazy" />
+            <div className="attachment-photo-overlay">
+              <div className="attachment-photo-actions">
+                <button className="attachment-action-btn attachment-action-btn--photo" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
+                  <Maximize2 size={14} />
+                </button>
+                <button className="attachment-action-btn attachment-action-btn--photo" title="Download" onClick={() => handleDownload(message.content, fileName)}>
+                  <Download size={14} />
+                </button>
+                <button className="attachment-action-btn attachment-action-btn--photo" title="Save" onClick={() => handleSave(message.content, fileName)}>
+                  <Save size={14} />
+                </button>
+              </div>
+              <div className="attachment-photo-footer">
+                {isPinned && (
+                  <span className="bubble-flag bubble-flag--pin bubble-flag--photo" title="Pinned">
+                    <Pin size={11} />
+                  </span>
+                )}
+                {isStarred && (
+                  <span className="bubble-flag bubble-flag--star bubble-flag--photo" title="Starred">
+                    <Star size={11} fill="currentColor" />
+                  </span>
+                )}
+                <span className="attachment-photo-time">
+                  {time}
+                  {isMine && (
+                    <span className="attachment-photo-tick" title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
+                      {isScheduled ? (
+                        <Clock size={12} strokeWidth={2.2} />
+                      ) : isRead ? (
+                        <svg width="13" height="9" viewBox="0 0 16 11" fill="#53bdeb">
+                          <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                          <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
+                        </svg>
+                      ) : isDelivered ? (
+                        <svg width="13" height="9" viewBox="0 0 16 11" fill="#8696A0">
+                          <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                          <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
+                        </svg>
+                      ) : null}
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -249,6 +283,10 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
   }
 
   const showEdited = message.editedAt && !isScheduled
+  const isPhotoMessage = message.messageType === 'photo' || message.messageType === 'camera'
+  const bubbleClassName = isPhotoMessage
+    ? 'bubble bubble--media'
+    : `bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`
 
   return (
     <>
@@ -261,9 +299,10 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
-        <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`} onContextMenu={(event) => onContextMenu && onContextMenu(event, message)}>
-          {renderContent()}
-          <span className="bubble-meta">
+        <div className="bubble-shell">
+          <div className={bubbleClassName} onContextMenu={(event) => onContextMenu && onContextMenu(event, message)}>
+            {renderContent()}
+            <span className="bubble-meta">
             {isPinned && (
               <span className="bubble-flag bubble-flag--pin" title="Pinned">
                 <Pin size={11} />
@@ -315,25 +354,26 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
                 )}
               </span>
             )}
-          </span>
+            </span>
+          </div>
+          {(isHovering || menuActive) && (
+            <button
+              ref={arrowRef}
+              className="bubble-menu-trigger"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const rect = arrowRef.current?.getBoundingClientRect()
+                if (onMenuClick) {
+                  onMenuClick(e, message, rect)
+                }
+              }}
+              title="Message options"
+            >
+              <ChevronDown size={18} />
+            </button>
+          )}
         </div>
-        {isHovering && (
-          <button
-            ref={arrowRef}
-            className="bubble-menu-trigger"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              const rect = arrowRef.current?.getBoundingClientRect()
-              if (onMenuClick) {
-                onMenuClick(e, message, rect)
-              }
-            }}
-            title="Message options"
-          >
-            <ChevronDown size={18} />
-          </button>
-        )}
       </motion.div>
     </>
   )
