@@ -554,6 +554,40 @@ a:hover { text-decoration: underline; }
   display: flex; gap: 8px; align-items: center;
 }
 
+.attachment-wrap {
+  position: relative;
+}
+
+.attachment-menu {
+  position: absolute;
+  bottom: 52px;
+  left: 0;
+  width: 210px;
+  background: linear-gradient(180deg, rgba(32, 44, 51, 0.98) 0%, rgba(17, 27, 33, 0.98) 100%);
+  border: 1px solid rgba(134, 150, 160, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+  z-index: 90;
+}
+
+.attachment-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  color: var(--wa-text-primary);
+  font-size: 13px;
+  transition: background var(--transition), color var(--transition);
+}
+
+.attachment-item:hover {
+  background: rgba(0, 168, 132, 0.16);
+  color: #fff;
+}
+
 .action-btn {
   width: 40px; height: 40px;
   border-radius: 50%;
@@ -874,6 +908,53 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
   color: inherit;
   opacity: 0.8;
+}
+
+/* ── Attachment Messages ───────────────────────────────── */
+.attachment-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attachment-photo,
+.attachment-video {
+  width: min(300px, 56vw);
+  max-height: 320px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.attachment-message--document,
+.attachment-message--location {
+  text-decoration: none;
+  color: var(--wa-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 180px;
+}
+
+.attachment-message--document:hover,
+.attachment-message--location:hover {
+  background: rgba(0, 168, 132, 0.16);
+}
+
+.attachment-doc-icon,
+.attachment-location-icon {
+  font-size: 18px;
+}
+
+.attachment-doc-name,
+.attachment-location-text {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Emoji Message ────────────────────────────────────── */

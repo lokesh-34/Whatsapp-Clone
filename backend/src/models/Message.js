@@ -54,11 +54,15 @@ const messageSchema = new mongoose.Schema(
     },
     messageType: {
       type: String,
-      enum: ['text', 'voice', 'emoji'],
+      enum: ['text', 'voice', 'emoji', 'photo', 'camera', 'video', 'document', 'location'],
       default: 'text',
     },
     voiceDuration: {
       type: Number,
+      default: null,
+    },
+    attachmentMeta: {
+      type: mongoose.Schema.Types.Mixed,
       default: null,
     },
     editedAt: {

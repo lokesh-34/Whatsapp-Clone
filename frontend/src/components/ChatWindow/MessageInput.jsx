@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSocket } from '../../context/SocketContext'
-import { Send, Smile, Mic, Square, Clock, Check, X } from 'lucide-react'
+import { Send, Smile, Mic, Square, Clock, Check, X, Paperclip, Camera, Image, Video, FileText, MapPin } from 'lucide-react'
 import { voiceRecorder } from '../../lib/voiceRecorder'
 
 const getDefaultScheduleValue = () => {
@@ -15,6 +15,7 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
   const [text, setText]            = useState('')
   const [typing, setTyping]        = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [showSchedulePicker, setShowSchedulePicker] = useState(false)
   const [scheduledFor, setScheduledFor]       = useState(getDefaultScheduleValue())
   const [isRecording, setIsRecording]         = useState(false)
@@ -25,6 +26,11 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
   const inputRef                   = useRef(null)
   const recordingTimerRef          = useRef(null)
   const emojiPickerRef             = useRef(null)
+  const attachmentMenuRef          = useRef(null)
+  const cameraInputRef             = useRef(null)
+  const photoInputRef              = useRef(null)
+  const videoInputRef              = useRef(null)
+  const documentInputRef           = useRef(null)
 
   // Common emojis
   const commonEmojis = ['😀', '😂', '😍', '😢', '😡', '👍', '👎', '❤️', '🔥', '✨', '💯', '😎', '🤔', '😴', '🤮', '🎉', '😘', '💪', '🙏', '👏', '🎊', '🎈', '🌟', '💝']
@@ -35,16 +41,20 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
     if (editingMessage) {
       setText(editingMessage.content || '')
       setShowEmojiPicker(false)
+      setShowAttachmentMenu(false)
       setShowSchedulePicker(false)
       inputRef.current?.focus()
     }
   }, [editingMessage])
 
-  // Close emoji picker when clicking outside
+  // Close floating pickers when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
         setShowEmojiPicker(false)
+      }
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target)) {
+        setShowAttachmentMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -93,6 +103,7 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
       if (event.key === 'Escape') {
         if (isRecording) return // handled by recording handler
         setShowEmojiPicker(false)
+        setShowAttachmentMenu(false)
         setShowSchedulePicker(false)
       }
     }
@@ -117,6 +128,7 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
     onSend(content, messageType, metadata)
     setText('')
     setShowEmojiPicker(false)
+    setShowAttachmentMenu(false)
     setShowSchedulePicker(false)
     clearTimeout(typingTimer.current)
     if (typing && socket && selectedUser) {
@@ -169,6 +181,66 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
 
   const handleEmojiSend = (emoji) => {
     handleSend(emoji, 'emoji')
+  }
+
+  const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('Failed to read selected file'))
+    reader.readAsDataURL(file)
+  })
+
+  const handleAttachmentFile = async (event, attachmentType) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const maxBytes = 15 * 1024 * 1024
+    if (file.size > maxBytes) {
+      alert('File is too large. Maximum allowed size is 15MB.')
+      return
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      handleSend(dataUrl, attachmentType, {
+        attachmentMeta: {
+          name: file.name,
+          mime: file.type || 'application/octet-stream',
+          size: file.size,
+        },
+      })
+    } catch (error) {
+      console.error('Attachment processing failed:', error)
+      alert('Failed to attach file')
+    }
+  }
+
+  const handleShareLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported in this browser.')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = Number(position.coords.latitude)
+        const lng = Number(position.coords.longitude)
+        const url = `https://maps.google.com/?q=${lat},${lng}`
+        handleSend(url, 'location', {
+          attachmentMeta: {
+            label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+            lat,
+            lng,
+          },
+        })
+      },
+      (error) => {
+        console.error('Location error:', error)
+        alert('Unable to access your location.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   const handleStartVoiceRecord = async () => {
@@ -228,6 +300,83 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
           )}
 
           <div className="input-actions">
+            {!editingMessage && (
+              <div className="attachment-wrap" ref={attachmentMenuRef}>
+                <motion.button
+                  className="action-btn attachment-btn"
+                  onClick={() => setShowAttachmentMenu(prev => !prev)}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  title="Attach"
+                >
+                  <Paperclip size={20} />
+                </motion.button>
+
+                <AnimatePresence>
+                  {showAttachmentMenu && (
+                    <motion.div
+                      className="attachment-menu"
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <button className="attachment-item" type="button" onClick={() => cameraInputRef.current?.click()}>
+                        <Camera size={16} />
+                        <span>Camera</span>
+                      </button>
+                      <button className="attachment-item" type="button" onClick={() => photoInputRef.current?.click()}>
+                        <Image size={16} />
+                        <span>Photo</span>
+                      </button>
+                      <button className="attachment-item" type="button" onClick={() => videoInputRef.current?.click()}>
+                        <Video size={16} />
+                        <span>Video</span>
+                      </button>
+                      <button className="attachment-item" type="button" onClick={() => documentInputRef.current?.click()}>
+                        <FileText size={16} />
+                        <span>Document</span>
+                      </button>
+                      <button className="attachment-item" type="button" onClick={handleShareLocation}>
+                        <MapPin size={16} />
+                        <span>Location</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleAttachmentFile(e, 'camera')}
+                />
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleAttachmentFile(e, 'photo')}
+                />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleAttachmentFile(e, 'video')}
+                />
+                <input
+                  ref={documentInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.zip,.rar"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleAttachmentFile(e, 'document')}
+                />
+              </div>
+            )}
+
             <motion.button
               className="action-btn emoji-btn"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}

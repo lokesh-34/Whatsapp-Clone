@@ -55,6 +55,7 @@ const getConversations = async (req, res, next) => {
             lastSeen:    '$user.lastSeen',
           },
           lastMessage: {
+            _id: '$lastMessage._id',
             encryptedMessage: '$lastMessage.encryptedMessage',
             iv: '$lastMessage.iv',
             encryptedKey: '$lastMessage.encryptedKey',
@@ -68,6 +69,8 @@ const getConversations = async (req, res, next) => {
             read: '$lastMessage.read',
             messageType: '$lastMessage.messageType',
             voiceDuration: '$lastMessage.voiceDuration',
+            attachmentMeta: '$lastMessage.attachmentMeta',
+            editedAt: '$lastMessage.editedAt',
           },
           unreadCount: 1,
         },
@@ -120,7 +123,7 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: errors.array()[0].msg })
 
     const { userId }  = req.params
-    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null } = req.body
+    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = req.body
     const senderId    = req.user._id
 
     if (userId === senderId.toString())
@@ -143,6 +146,7 @@ const sendMessage = async (req, res, next) => {
       encryptedKey: encryptedKey || null,
       messageType,
       voiceDuration: messageType === 'voice' ? voiceDuration : null,
+      attachmentMeta: attachmentMeta || null,
       scheduledFor: isScheduled ? scheduledDate : null,
       scheduledStatus: isScheduled ? 'scheduled' : 'sent',
       sentAt: isScheduled ? null : new Date(),

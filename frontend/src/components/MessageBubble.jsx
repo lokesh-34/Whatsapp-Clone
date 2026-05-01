@@ -118,6 +118,48 @@ export default function MessageBubble({ message, isMine, onEditRequest }) {
       )
     }
 
+    if (message.messageType === 'photo' || message.messageType === 'camera') {
+      return (
+        <div className="attachment-message attachment-message--photo">
+          <img src={message.content} alt="Shared attachment" className="attachment-photo" loading="lazy" />
+        </div>
+      )
+    }
+
+    if (message.messageType === 'video') {
+      return (
+        <div className="attachment-message attachment-message--video">
+          <video src={message.content} controls className="attachment-video" preload="metadata" />
+        </div>
+      )
+    }
+
+    if (message.messageType === 'document') {
+      const name = message.attachmentMeta?.name || 'document'
+      return (
+        <a
+          className="attachment-message attachment-message--document"
+          href={message.content}
+          download={name}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="attachment-doc-icon">📄</span>
+          <span className="attachment-doc-name">{name}</span>
+        </a>
+      )
+    }
+
+    if (message.messageType === 'location') {
+      const label = message.attachmentMeta?.label || 'Open location'
+      return (
+        <a className="attachment-message attachment-message--location" href={message.content} target="_blank" rel="noreferrer">
+          <span className="attachment-location-icon">📍</span>
+          <span className="attachment-location-text">{label}</span>
+        </a>
+      )
+    }
+
     // Default text message
     return <span className="bubble-text">{message.content}</span>
   }

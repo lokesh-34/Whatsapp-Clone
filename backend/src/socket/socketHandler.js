@@ -17,6 +17,9 @@ const emitMessageStatus = (io, message) => {
     deliveredAt: message.deliveredAt || null,
     readAt: message.readAt || null,
     read: !!message.read,
+    scheduledStatus: message.scheduledStatus || 'sent',
+    sentAt: message.sentAt || null,
+    scheduledFor: message.scheduledFor || null,
   }
 
   io.to(payload.senderId.toString()).emit('messageStatusUpdated', payload)
@@ -54,7 +57,7 @@ const socketHandler = (io) => {
     // ── sendMessage ─────────────────────────────────────────
     socket.on('sendMessage', async (data, callback) => {
       try {
-        const { to, encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null } = data
+        const { to, encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = data
 
         if (!to || !encryptedMessage) {
           return callback?.({ success: false, error: 'Invalid message data.' })
@@ -80,6 +83,7 @@ const socketHandler = (io) => {
           encryptedKey: encryptedKey || null,
           messageType,
           voiceDuration: messageType === 'voice' ? voiceDuration : null,
+          attachmentMeta: attachmentMeta || null,
           scheduledFor: isScheduled ? scheduledDate : null,
           scheduledStatus: isScheduled ? 'scheduled' : 'sent',
           sentAt: isScheduled ? null : new Date(),

@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { X, Trash, Clock } from 'lucide-react'
 import { getScheduledMessages, cancelScheduledMessage } from '../../api'
 
+const getScheduledPreview = (type) => {
+  if (type === 'voice') return '🎤 Voice message'
+  if (type === 'photo' || type === 'camera') return '📷 Photo'
+  if (type === 'video') return '🎬 Video'
+  if (type === 'document') return '📄 Document'
+  if (type === 'location') return '📍 Location'
+  if (type === 'emoji') return '😀 Emoji'
+  return '🔒 Encrypted'
+}
+
 export default function ScheduledList({ open, onClose, userId, onCancelled }) {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState([])
@@ -48,7 +58,7 @@ export default function ScheduledList({ open, onClose, userId, onCancelled }) {
               <li key={item._id} className="scheduled-item">
                 <div className="left">
                   <div className="meta"><Clock size={14} /> {new Date(item.scheduledFor).toLocaleString()}</div>
-                  <div className="content">{item.messageType === 'voice' ? '🎤 Voice message' : (item.messageType === 'emoji' ? item.encryptedMessage : '🔒 Encrypted')}</div>
+                  <div className="content">{getScheduledPreview(item.messageType)}</div>
                 </div>
                 <div className="actions">
                   <button className="cancel-btn" title="Cancel" onClick={() => handleCancel(item._id)}><Trash size={14} /></button>

@@ -21,6 +21,15 @@ export default function Chat() {
   const { user, logout }     = useAuth()
   const { socket, isOnline } = useSocket()
 
+  const getPreviewText = (messageType, content) => {
+    if (messageType === 'voice') return '🎤 Voice message'
+    if (messageType === 'photo' || messageType === 'camera') return '📷 Photo'
+    if (messageType === 'video') return '🎬 Video'
+    if (messageType === 'document') return '📄 Document'
+    if (messageType === 'location') return '📍 Location'
+    return content
+  }
+
   // ── Search ────────────────────────────────────────────────
   const [searchQuery,   setSearch]    = useState('')
   const [searchResults, setResults]   = useState([])
@@ -53,12 +62,7 @@ export default function Chat() {
              const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
              
              // Determine preview text based on message type
-             let previewContent = content
-             if (lastMessage.messageType === 'voice') {
-               previewContent = '🎤 Voice message'
-             } else if (lastMessage.messageType === 'emoji') {
-               previewContent = content // Keep emoji as-is
-             }
+             const previewContent = getPreviewText(lastMessage.messageType, content)
              
              return { ...conv, lastMessage: { ...lastMessage, content: previewContent } }
            } catch (err) {
@@ -164,6 +168,7 @@ export default function Chat() {
           createdAt: messageData?.createdAt || new Date().toISOString(),
           sender: user._id,
           messageType,
+          attachmentMeta: messageData?.attachmentMeta || metadata.attachmentMeta || null,
           scheduledFor: messageData?.scheduledFor || metadata.scheduledFor || null,
           scheduledStatus: messageData?.scheduledStatus || (metadata.scheduledFor ? 'scheduled' : 'sent'),
           sentAt: messageData?.sentAt || null,
@@ -185,21 +190,28 @@ export default function Chat() {
           messageType,
           voiceDuration: metadata.duration || null,
           scheduledFor: metadata.scheduledFor || null,
+          attachmentMeta: metadata.attachmentMeta || null,
         }, (res) => {
           if (res?.success) {
             const sentMessage = { ...res.message, content, messageType }
             setMessages(prev => [...prev, sentMessage])
-            const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
+            const sidebarPreview = getPreviewText(messageType, content)
             updateRecent(sentMessage, sidebarPreview)
           } else {
             console.error('Send failed:', res?.error || 'Unknown socket error')
           }
         })
       } else {
-        const { data } = await sendMessage(selectedUser._id, { ...payload, scheduledFor: metadata.scheduledFor || null })
+        const { data } = await sendMessage(selectedUser._id, {
+          ...payload,
+          scheduledFor: metadata.scheduledFor || null,
+          messageType,
+          voiceDuration: metadata.duration || null,
+          attachmentMeta: metadata.attachmentMeta || null,
+        })
         const sentMessage = { ...data.message, content, messageType }
         setMessages(prev => [...prev, sentMessage])
-        const sidebarPreview = messageType === 'voice' ? '🎤 Voice message' : content
+        const sidebarPreview = getPreviewText(messageType, content)
         updateRecent(sentMessage, sidebarPreview)
       }
     } catch (err) {
@@ -270,12 +282,7 @@ export default function Chat() {
         const exists   = prev.find(c => c.user._id.toString() === senderId)
         
         // Determine preview text based on message type
-        let sidebarPreview = displayMsg.content
-        if (msg.messageType === 'voice') {
-          sidebarPreview = '🎤 Voice message'
-        } else if (msg.messageType === 'emoji') {
-          sidebarPreview = displayMsg.content // Keep emoji as-is
-        }
+        const sidebarPreview = getPreviewText(msg.messageType, displayMsg.content)
         
         const newLast  = {
           content:   sidebarPreview,
