@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion'
-import { Play, Pause, Clock, Edit, Maximize2, Download, Save, Share2, Pin, Star } from 'lucide-react'
+import { Play, Pause, Clock, Edit, Maximize2, Download, Save, Share2, Pin, Star, ChevronDown } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia, onForwardRequest, onContextMenu, isPinned = false, isStarred = false }) {
+export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia, onForwardRequest, onContextMenu, onMenuClick, isPinned = false, isStarred = false }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
+  const [isHovering, setIsHovering] = useState(false)
   const audioRef = useRef(null)
+  const arrowRef = useRef(null)
 
   const timeSource = message.sentAt || message.createdAt
   const time = new Date(timeSource).toLocaleTimeString([], {
@@ -256,6 +258,8 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
         animate={{ opacity: 1, x: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 380, damping: 28 }}
         layout
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
       >
         <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`} onContextMenu={(event) => onContextMenu && onContextMenu(event, message)}>
           {renderContent()}
@@ -313,6 +317,23 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
             )}
           </span>
         </div>
+        {isHovering && (
+          <button
+            ref={arrowRef}
+            className="bubble-menu-trigger"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const rect = arrowRef.current?.getBoundingClientRect()
+              if (onMenuClick) {
+                onMenuClick(e, message, rect)
+              }
+            }}
+            title="Message options"
+          >
+            <ChevronDown size={18} />
+          </button>
+        )}
       </motion.div>
     </>
   )

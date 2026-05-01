@@ -22,7 +22,13 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   }, [messages])
 
   useEffect(() => {
-    const close = () => setMenuState({ open: false, x: 0, y: 0, message: null })
+        const close = (e) => {
+          // Don't close if clicking on menu or arrow button
+          if (e.target.closest('.message-context-menu') || e.target.closest('.bubble-menu-trigger')) {
+            return
+          }
+          setMenuState({ open: false, x: 0, y: 0, message: null })
+        }
     document.addEventListener('mousedown', close)
     window.addEventListener('scroll', close, true)
     window.addEventListener('resize', close)
@@ -122,12 +128,14 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
 
   const closeMenu = () => setMenuState({ open: false, x: 0, y: 0, message: null })
 
-  const handleMenuForward = () => {
+  const handleMenuForward = (e) => {
+    e?.stopPropagation?.()
     if (menuState.message && onForwardRequest) onForwardRequest(menuState.message)
     closeMenu()
   }
 
-  const handlePinToggle = async () => {
+  const handlePinToggle = async (e) => {
+    e?.stopPropagation?.()
     const message = menuState.message
     if (!message) return
     const { data } = await togglePinMessage(message._id)
@@ -135,7 +143,8 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
     closeMenu()
   }
 
-  const handleStarToggle = async () => {
+  const handleStarToggle = async (e) => {
+    e?.stopPropagation?.()
     const message = menuState.message
     if (!message) return
     const { data } = await toggleStarMessage(message._id)
@@ -143,7 +152,8 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
     closeMenu()
   }
 
-  const handleDelete = async (scope = 'me') => {
+  const handleDelete = async (e, scope = 'me') => {
+    e?.stopPropagation?.()
     const message = menuState.message
     if (!message) return
     const { data } = await deleteMessage(message._id, { scope })
@@ -154,6 +164,13 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   const openContextMenu = (event, message) => {
     event.preventDefault()
     setMenuState({ open: true, x: event.clientX, y: event.clientY, message })
+  }
+
+  const handleArrowClick = (event, message, arrowRect) => {
+    // Open menu positioned below the arrow
+    const x = arrowRect?.left || event.clientX
+    const y = (arrowRect?.bottom || event.clientY) + 4
+    setMenuState({ open: true, x, y, message })
   }
 
   const goPrev = () => {
@@ -220,6 +237,7 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
               onOpenMedia={openViewerForMessage}
               onForwardRequest={onForwardRequest}
               onContextMenu={openContextMenu}
+              onMenuClick={handleArrowClick}
               isPinned={Boolean(msg.pinnedBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
               isStarred={Boolean(msg.starredBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
             />
@@ -230,20 +248,20 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
 
       {menuState.open && menuState.message && (
         <div className="message-context-menu" style={{ left: menuState.x, top: menuState.y }} onMouseLeave={closeMenu}>
-          <button className="message-context-menu-item" onClick={handleMenuForward}>
+          <button type="button" className="message-context-menu-item" onClick={(e) => handleMenuForward(e)}>
             <Share2 size={14} /> Forward
           </button>
-          <button className="message-context-menu-item" onClick={handlePinToggle}>
+          <button type="button" className="message-context-menu-item" onClick={(e) => handlePinToggle(e)}>
             <Pin size={14} /> {getBubbleState(menuState.message).pinned ? 'Unpin' : 'Pin'}
           </button>
-          <button className="message-context-menu-item" onClick={handleStarToggle}>
+          <button type="button" className="message-context-menu-item" onClick={(e) => handleStarToggle(e)}>
             <Star size={14} /> {getBubbleState(menuState.message).starred ? 'Unstar' : 'Star'}
           </button>
-          <button className="message-context-menu-item message-context-menu-item--danger" onClick={() => handleDelete('me')}>
+          <button type="button" className="message-context-menu-item message-context-menu-item--danger" onClick={(e) => handleDelete(e, 'me')}>
             <Trash2 size={14} /> Delete for me
           </button>
           {menuState.message?.sender?._id?.toString?.() === currentUserId && (
-            <button className="message-context-menu-item message-context-menu-item--danger" onClick={() => handleDelete('everyone')}>
+            <button type="button" className="message-context-menu-item message-context-menu-item--danger" onClick={(e) => handleDelete(e, 'everyone')}>
               <Trash2 size={14} /> Delete for everyone
             </button>
           )}
