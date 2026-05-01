@@ -69,9 +69,33 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    pinnedBy: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
+    starredBy: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
+    deletedFor: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
     editedContent: {
       type: String,
       default: null,
+    },
+    forwardedFrom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    isForwarded: {
+      type: Boolean,
+      default: false,
     },
   },
   {

@@ -390,11 +390,45 @@ export default function Chat() {
       }))
     }
 
+    const handleMessagePinned = ({ messageId, pinned }) => {
+      if (!messageId) return
+      setMessages(prev => prev.map((msg) => (
+        msg._id === messageId ? { ...msg, pinnedBy: pinned ? [user._id] : [] } : msg
+      )))
+    }
+
+    const handleMessageStarred = ({ messageId, starred }) => {
+      if (!messageId) return
+      setMessages(prev => prev.map((msg) => (
+        msg._id === messageId ? { ...msg, starredBy: starred ? [user._id] : [] } : msg
+      )))
+    }
+
+    const handleMessageDeleted = ({ messageId, deletedForEveryone, actorId }) => {
+      if (!messageId) return
+
+      setMessages(prev => prev.filter((msg) => msg._id !== messageId))
+
+      setRecentChats(prev => prev.map((conv) => {
+        if (conv.lastMessage?._id !== messageId) return conv
+        if (deletedForEveryone) {
+          return { ...conv, lastMessage: null }
+        }
+        if (actorId && actorId.toString() === user._id.toString()) {
+          return { ...conv, lastMessage: null }
+        }
+        return conv
+      }))
+    }
+
     socket.on('newMessage',        handleNewMessage)
     socket.on('userTyping',        handleTyping)
     socket.on('userStoppedTyping', handleStopTyping)
     socket.on('messageStatusUpdated', handleMessageStatusUpdated)
     socket.on('messageEdited', handleMessageEdited)
+    socket.on('messagePinned', handleMessagePinned)
+    socket.on('messageStarred', handleMessageStarred)
+    socket.on('messageDeleted', handleMessageDeleted)
 
     return () => {
       socket.off('newMessage',        handleNewMessage)
@@ -402,6 +436,9 @@ export default function Chat() {
       socket.off('userStoppedTyping', handleStopTyping)
       socket.off('messageStatusUpdated', handleMessageStatusUpdated)
       socket.off('messageEdited', handleMessageEdited)
+      socket.off('messagePinned', handleMessagePinned)
+      socket.off('messageStarred', handleMessageStarred)
+      socket.off('messageDeleted', handleMessageDeleted)
     }
   }, [socket, selectedUser, user])
 

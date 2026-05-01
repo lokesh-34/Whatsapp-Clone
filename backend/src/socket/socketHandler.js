@@ -148,6 +148,69 @@ const socketHandler = (io) => {
       }
     })
 
+    // ── forwardMessage ────────────────────────────────────────
+    socket.on('forwardMessage', async (data, callback) => {
+      try {
+        const { messageId, to, encryptedMessage, iv, encryptedKey } = data
+
+        if (!messageId || !to || !encryptedMessage) {
+          return callback?.({ success: false, error: 'Invalid forward data.' })
+        }
+
+        if (to === userId) {
+          return callback?.({ success: false, error: 'Cannot forward a message to yourself.' })
+        }
+
+        const originalMessage = await Message.findById(messageId)
+        if (!originalMessage) {
+          return callback?.({ success: false, error: 'Original message not found.' })
+        }
+
+        const receiver = await User.findById(to).select('username isOnline pushTokens')
+        if (!receiver) {
+          return callback?.({ success: false, error: 'Recipient not found.' })
+        }
+
+        // Create forwarded message with link to original
+        const forwardedMessage = await Message.create({
+          sender: userId,
+          receiver: to,
+          encryptedMessage,
+          iv,
+          encryptedKey: encryptedKey || null,
+          messageType: originalMessage.messageType,
+          voiceDuration: originalMessage.voiceDuration || null,
+          attachmentMeta: originalMessage.attachmentMeta || null,
+          forwardedFrom: originalMessage._id,
+          isForwarded: true,
+          sentAt: new Date(),
+          deliveredAt: getSocketIds(to).size > 0 ? new Date() : null,
+        })
+
+        await forwardedMessage.populate('sender', 'username avatarColor')
+        await forwardedMessage.populate('receiver', 'username avatarColor')
+        await forwardedMessage.populate('forwardedFrom')
+
+        const messageObj = forwardedMessage.toObject()
+
+        // Deliver to receiver in real-time
+        socket.to(to.toString()).emit('newMessage', messageObj)
+
+        // Emit status update
+        if (getSocketIds(to).size > 0) {
+          emitMessageStatus(io, messageObj)
+        }
+
+        // Send push notification
+        await sendPushNotification({ receiver, sender: forwardedMessage.sender, message: messageObj })
+
+        callback?.({ success: true, message: messageObj })
+      } catch (error) {
+        console.error('Socket forwardMessage error:', error.message)
+        callback?.({ success: false, error: 'Failed to forward message.' })
+      }
+    })
+
     // ── Disconnect ───────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`🔴 User disconnected: ${socket.user.username} (${socket.id})`)

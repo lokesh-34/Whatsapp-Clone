@@ -4,6 +4,9 @@ const User    = require('../models/User')
 const { sendPushNotification } = require('../services/pushNotifications')
 const { getIO } = require('../socket/io')
 
+const toIdString = (value) => value?.toString?.() || String(value)
+const includesUserId = (ids, userId) => (ids || []).some((id) => toIdString(id) === toIdString(userId))
+
 // ── GET /api/messages/conversations ─────────────────────────
 // Returns all users this person has chatted with, sorted by last message
 const getConversations = async (req, res, next) => {
@@ -12,7 +15,7 @@ const getConversations = async (req, res, next) => {
 
     const conversations = await Message.aggregate([
       // All messages involving me
-      { $match: { $or: [{ sender: myId }, { receiver: myId }] } },
+      { $match: { $or: [{ sender: myId }, { receiver: myId }], deletedFor: { $ne: myId } } },
 
       // Sort so $last gives the most recent
       { $sort: { createdAt: 1 } },
@@ -71,6 +74,9 @@ const getConversations = async (req, res, next) => {
             voiceDuration: '$lastMessage.voiceDuration',
             attachmentMeta: '$lastMessage.attachmentMeta',
             editedAt: '$lastMessage.editedAt',
+            pinnedBy: '$lastMessage.pinnedBy',
+            starredBy: '$lastMessage.starredBy',
+            deletedFor: '$lastMessage.deletedFor',
           },
           unreadCount: 1,
         },
@@ -97,6 +103,7 @@ const getMessages = async (req, res, next) => {
         { sender: myId, receiver: userId },
         { sender: userId, receiver: myId },
       ],
+      deletedFor: { $ne: myId },
     })
       .populate('sender',   'username avatarColor avatar')
       .populate('receiver', 'username avatarColor avatar')
@@ -172,7 +179,7 @@ const getUnreadCounts = async (req, res, next) => {
   try {
     const myId = req.user._id
     const unreadCounts = await Message.aggregate([
-      { $match: { receiver: myId, read: false } },
+      { $match: { receiver: myId, read: false, deletedFor: { $ne: myId } } },
       { $group: { _id: '$sender', count: { $sum: 1 } } },
     ])
     const countsMap = {}
@@ -314,5 +321,239 @@ const editMessage = async (req, res, next) => {
   }
 }
 
-module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage, editMessage }
+// ── PATCH /api/messages/:messageId/pin ───────────────────────
+const togglePinMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const myId = req.user._id
+
+    const message = await Message.findById(messageId)
+    if (!message) return res.status(404).json({ success: false, message: 'Message not found.' })
+    if (includesUserId(message.deletedFor, myId)) {
+      return res.status(404).json({ success: false, message: 'Message not found.' })
+    }
+
+    const pinned = includesUserId(message.pinnedBy, myId)
+    message.pinnedBy = pinned
+      ? message.pinnedBy.filter((id) => toIdString(id) !== toIdString(myId))
+      : [...message.pinnedBy, myId]
+    await message.save()
+
+    const payload = {
+      messageId: message._id,
+      pinned: !pinned,
+      pinnedBy: message.pinnedBy,
+      actorId: myId,
+    }
+
+    try {
+      const io = getIO()
+      if (io) io.to(myId.toString()).emit('messagePinned', payload)
+    } catch (emitErr) {
+      console.error('Failed to emit pin event:', emitErr.message)
+    }
+
+    res.status(200).json({ success: true, message: message.toObject(), pinned: !pinned })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// ── PATCH /api/messages/:messageId/star ───────────────────────
+const toggleStarMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const myId = req.user._id
+
+    const message = await Message.findById(messageId)
+    if (!message) return res.status(404).json({ success: false, message: 'Message not found.' })
+    if (includesUserId(message.deletedFor, myId)) {
+      return res.status(404).json({ success: false, message: 'Message not found.' })
+    }
+
+    const starred = includesUserId(message.starredBy, myId)
+    message.starredBy = starred
+      ? message.starredBy.filter((id) => toIdString(id) !== toIdString(myId))
+      : [...message.starredBy, myId]
+    await message.save()
+
+    const payload = {
+      messageId: message._id,
+      starred: !starred,
+      starredBy: message.starredBy,
+      actorId: myId,
+    }
+
+    try {
+      const io = getIO()
+      if (io) io.to(myId.toString()).emit('messageStarred', payload)
+    } catch (emitErr) {
+      console.error('Failed to emit star event:', emitErr.message)
+    }
+
+    res.status(200).json({ success: true, message: message.toObject(), starred: !starred })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// ── DELETE /api/messages/:messageId ───────────────────────────
+const deleteMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const { scope = 'me' } = req.body || {}
+    const myId = req.user._id
+    const DELETE_FOR_EVERYONE_LIMIT_MS = 15 * 60 * 1000
+
+    const message = await Message.findById(messageId)
+    if (!message) return res.status(404).json({ success: false, message: 'Message not found.' })
+
+    const visibleToMe = !includesUserId(message.deletedFor, myId)
+    if (!visibleToMe) return res.status(404).json({ success: false, message: 'Message not found.' })
+
+    const canDeleteForEveryone = message.sender.toString() === myId.toString() && (() => {
+      const messageTime = message.sentAt || message.createdAt
+      return Date.now() - messageTime.getTime() <= DELETE_FOR_EVERYONE_LIMIT_MS
+    })()
+
+    const deleteForEveryone = scope === 'everyone' && canDeleteForEveryone
+    if (scope === 'everyone' && !deleteForEveryone) {
+      return res.status(400).json({ success: false, message: 'Message can only be deleted for everyone within 15 minutes by the sender.' })
+    }
+
+    const targetIds = deleteForEveryone
+      ? Array.from(new Set([toIdString(message.sender), toIdString(message.receiver)]))
+      : [toIdString(myId)]
+
+    message.deletedFor = Array.from(new Set([
+      ...(message.deletedFor || []).map(toIdString),
+      ...targetIds,
+    ]))
+
+    await message.save()
+
+    const payload = {
+      messageId: message._id,
+      senderId: message.sender,
+      receiverId: message.receiver,
+      deletedFor: message.deletedFor,
+      deletedForEveryone: deleteForEveryone,
+      actorId: myId,
+    }
+
+    try {
+      const io = getIO()
+      if (io) {
+        if (deleteForEveryone) {
+          io.to(toIdString(message.sender)).emit('messageDeleted', payload)
+          io.to(toIdString(message.receiver)).emit('messageDeleted', payload)
+        } else {
+          io.to(toIdString(myId)).emit('messageDeleted', payload)
+        }
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit delete event:', emitErr.message)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: deleteForEveryone ? 'Message deleted for everyone.' : 'Message deleted for you.',
+      data: { messageId: message._id, deletedForEveryone: deleteForEveryone },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// ── POST /api/messages/:messageId/forward ─────────────────────
+// Forward a message to another user via REST API
+const forwardMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const { to, encryptedMessage, iv, encryptedKey } = req.body
+    const senderId = req.user._id
+
+    if (!to || !encryptedMessage) {
+      return res.status(400).json({ success: false, message: 'Recipient and encrypted message are required.' })
+    }
+
+    if (to === senderId.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot forward a message to yourself.' })
+    }
+
+    const originalMessage = await Message.findById(messageId)
+    if (!originalMessage) {
+      return res.status(404).json({ success: false, message: 'Original message not found.' })
+    }
+
+    const receiver = await User.findById(to).select('username isOnline pushTokens')
+    if (!receiver) {
+      return res.status(404).json({ success: false, message: 'Recipient not found.' })
+    }
+
+    // Create forwarded message
+    const forwardedMessage = await Message.create({
+      sender: senderId,
+      receiver: to,
+      encryptedMessage,
+      iv,
+      encryptedKey: encryptedKey || null,
+      messageType: originalMessage.messageType,
+      voiceDuration: originalMessage.voiceDuration || null,
+      attachmentMeta: originalMessage.attachmentMeta || null,
+      forwardedFrom: originalMessage._id,
+      isForwarded: true,
+      sentAt: new Date(),
+    })
+
+    await forwardedMessage.populate('sender', 'username avatarColor avatar')
+    await forwardedMessage.populate('receiver', 'username avatarColor avatar')
+    await forwardedMessage.populate('forwardedFrom')
+
+    // Emit socket event if available
+    try {
+      const io = getIO()
+      if (io) {
+        const messageObj = forwardedMessage.toObject()
+        io.to(to).emit('newMessage', messageObj)
+        io.to(to).emit('messageStatusUpdated', {
+          messageId: forwardedMessage._id,
+          senderId: forwardedMessage.sender._id,
+          receiverId: forwardedMessage.receiver._id,
+          deliveredAt: new Date(),
+          readAt: null,
+          read: false,
+        })
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit forward event:', emitErr.message)
+    }
+
+    // Send push notification
+    const messageObj = forwardedMessage.toObject()
+    try {
+      await sendPushNotification({ receiver, sender: forwardedMessage.sender, message: messageObj })
+    } catch (notifErr) {
+      console.error('Push notification error:', notifErr.message)
+    }
+
+    res.status(201).json({ success: true, message: forwardedMessage })
+  } catch (error) {
+    next(error)
+  }
+}
+
+module.exports = {
+  getConversations,
+  getMessages,
+  sendMessage,
+  getUnreadCounts,
+  getScheduledMessages,
+  cancelScheduledMessage,
+  editMessage,
+  forwardMessage,
+  togglePinMessage,
+  toggleStarMessage,
+  deleteMessage,
+}
 

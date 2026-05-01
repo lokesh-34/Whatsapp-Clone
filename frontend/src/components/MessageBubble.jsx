@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
-import { Play, Pause, Clock, Edit, Maximize2, Download, Save } from 'lucide-react'
+import { Play, Pause, Clock, Edit, Maximize2, Download, Save, Share2, Pin, Star } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia }) {
+export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia, onForwardRequest, onContextMenu, isPinned = false, isStarred = false }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const audioRef = useRef(null)
@@ -257,9 +257,19 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
         transition={{ type: 'spring', stiffness: 380, damping: 28 }}
         layout
       >
-        <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`}>
+        <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`} onContextMenu={(event) => onContextMenu && onContextMenu(event, message)}>
           {renderContent()}
           <span className="bubble-meta">
+            {isPinned && (
+              <span className="bubble-flag bubble-flag--pin" title="Pinned">
+                <Pin size={11} />
+              </span>
+            )}
+            {isStarred && (
+              <span className="bubble-flag bubble-flag--star" title="Starred">
+                <Star size={11} fill="currentColor" />
+              </span>
+            )}
             {isEditableMessage() && (
               <button 
                 className="edit-msg-btn" 
@@ -267,6 +277,15 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
                 title="Edit message"
               >
                 <Edit size={12} />
+              </button>
+            )}
+            {!isMine && (
+              <button
+                className="forward-msg-btn"
+                onClick={() => onForwardRequest && onForwardRequest(message)}
+                title="Forward message"
+              >
+                <Share2 size={12} />
               </button>
             )}
             {showEdited && <span className="edited-label">edited</span>}

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Download, Save, Share2, X, Plus, Minus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Save, Share2, X, Plus, Minus, Pin, Star, Trash2 } from 'lucide-react'
 import MessageBubble from '../MessageBubble'
+import ForwardDialog from '../ForwardDialog'
+import { getUsers, forwardMessage, togglePinMessage, toggleStarMessage, deleteMessage } from '../../api'
+import e2ee from '../../lib/e2ee'
 
 export default function MessageList({ messages, currentUser, loading, onEditRequest }) {
   const bottomRef = useRef(null)
@@ -17,10 +20,21 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   }, [messages])
 
   const activeMedia = viewerIndex >= 0 ? mediaMessages[viewerIndex] : null
+  const [forwardOpen, setForwardOpen] = useState(false)
+  const [forwardMsg, setForwardMsg] = useState(null)
+  const [allUsers, setAllUsers] = useState([])
+  const [forwardLoading, setForwardLoading] = useState(false)
+  const [menuState, setMenuState] = useState({ open: false, x: 0, y: 0, message: null })
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    const handleOutsideClick = () => closeMenu()
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
 
   useEffect(() => {
     if (!activeMedia) return
@@ -124,6 +138,97 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
     if (idx >= 0) setViewerIndex(idx)
   }
 
+  const openForwardDialog = async (msg) => {
+    setForwardMsg(msg)
+    setForwardOpen(true)
+    if (!allUsers || allUsers.length === 0) {
+      try {
+        const { data } = await getUsers()
+        setAllUsers(data.users || [])
+      } catch (err) {
+        console.error('Failed to load users for forward dialog', err)
+      }
+    }
+  }
+
+  const closeForwardDialog = () => {
+    setForwardOpen(false)
+    setForwardMsg(null)
+  }
+
+  const closeMenu = () => setMenuState({ open: false, x: 0, y: 0, message: null })
+
+  useEffect(() => {
+    const onClose = () => closeMenu()
+    window.addEventListener('scroll', onClose, true)
+    window.addEventListener('resize', onClose)
+    return () => {
+      window.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('resize', onClose)
+    }
+  }, [])
+
+  const openContextMenu = (event, message) => {
+    event.preventDefault()
+    setMenuState({ open: true, x: event.clientX, y: event.clientY, message })
+  }
+
+  const getBubbleState = (message) => ({
+    pinned: Boolean(message?.pinnedBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId)),
+    starred: Boolean(message?.starredBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId)),
+  })
+
+  const handleForward = async (toUserId, message) => {
+    setForwardLoading(true)
+    try {
+      const payload = await e2ee.encryptForChat(currentUser._id, toUserId, message.content)
+      await forwardMessage(message._id, { to: toUserId, ...payload })
+    } catch (err) {
+      console.error('Forward failed:', err)
+      throw err
+    } finally {
+      setForwardLoading(false)
+    }
+  }
+
+  const patchMessageInList = (messageId, updater) => {
+    setMessages((prev) => prev.map((msg) => (msg._id === messageId ? updater(msg) : msg)))
+  }
+
+  const patchRecentChat = (messageId, updater) => {
+    if (!messageId) return
+    if (typeof window === 'undefined') return
+    // recent chats are maintained in parent; this handler keeps the open thread accurate
+  }
+
+  const handlePinToggle = async () => {
+    const message = menuState.message
+    if (!message) return
+    const { data } = await togglePinMessage(message._id)
+    patchMessageInList(message._id, (msg) => ({ ...msg, pinnedBy: data.message.pinnedBy || [] }))
+    closeMenu()
+  }
+
+  const handleStarToggle = async () => {
+    const message = menuState.message
+    if (!message) return
+    const { data } = await toggleStarMessage(message._id)
+    patchMessageInList(message._id, (msg) => ({ ...msg, starredBy: data.message.starredBy || [] }))
+    closeMenu()
+  }
+
+  const handleDelete = async (scope = 'me') => {
+    const message = menuState.message
+    if (!message) return
+    const { data } = await deleteMessage(message._id, { scope })
+    if (data?.data?.deletedForEveryone) {
+      setMessages((prev) => prev.filter((msg) => msg._id !== message._id))
+    } else {
+      setMessages((prev) => prev.filter((msg) => msg._id !== message._id))
+    }
+    closeMenu()
+  }
+
   const goPrev = () => {
     if (mediaMessages.length < 2) return
     setViewerIndex((idx) => (idx <= 0 ? mediaMessages.length - 1 : idx - 1))
@@ -191,11 +296,50 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
               isMine={(msg.sender?._id || msg.sender)?.toString?.() === currentUserId}
               onEditRequest={onEditRequest}
               onOpenMedia={openViewerForMessage}
+              onForwardRequest={(m) => openForwardDialog(m)}
+              onContextMenu={openContextMenu}
+              isPinned={Boolean(msg.pinnedBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
+              isStarred={Boolean(msg.starredBy?.some?.((id) => (id?._id || id)?.toString?.() === currentUserId))}
             />
           ))}
         </AnimatePresence>
       )}
       <div ref={bottomRef} />
+
+      {menuState.open && menuState.message && (
+        <div
+          className="message-context-menu"
+          style={{ left: menuState.x, top: menuState.y }}
+          onMouseLeave={closeMenu}
+        >
+          <button className="message-context-menu-item" onClick={() => { openForwardDialog(menuState.message); closeMenu() }}>
+            <Share2 size={14} /> Forward
+          </button>
+          <button className="message-context-menu-item" onClick={handlePinToggle}>
+            <Pin size={14} /> {getBubbleState(menuState.message).pinned ? 'Unpin' : 'Pin'}
+          </button>
+          <button className="message-context-menu-item" onClick={handleStarToggle}>
+            <Star size={14} /> {getBubbleState(menuState.message).starred ? 'Unstar' : 'Star'}
+          </button>
+          <button className="message-context-menu-item message-context-menu-item--danger" onClick={() => handleDelete('me')}>
+            <Trash2 size={14} /> Delete for me
+          </button>
+          {menuState.message?.sender?._id?.toString?.() === currentUserId && (
+            <button className="message-context-menu-item message-context-menu-item--danger" onClick={() => handleDelete('everyone')}>
+              <Trash2 size={14} /> Delete for everyone
+            </button>
+          )}
+        </div>
+      )}
+
+      <ForwardDialog
+        message={forwardMsg}
+        open={forwardOpen}
+        onClose={closeForwardDialog}
+        onForward={handleForward}
+        currentUser={currentUser}
+        allUsers={allUsers}
+      />
 
       {activeMedia && (
         <div className="media-preview-overlay" onClick={() => setViewerIndex(-1)}>

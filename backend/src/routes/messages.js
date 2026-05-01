@@ -1,6 +1,6 @@
 const express = require('express')
 const { body } = require('express-validator')
-const { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage, editMessage } = require('../controllers/messageController')
+const { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage, editMessage, forwardMessage, togglePinMessage, toggleStarMessage, deleteMessage } = require('../controllers/messageController')
 const { protect } = require('../middlewares/auth')
 
 const router = express.Router()
@@ -20,6 +20,18 @@ router.delete('/scheduled/:messageId', cancelScheduledMessage)
 
 // PUT /api/messages/:messageId/edit  (edit a text message within 15 minutes)
 router.put('/:messageId/edit', editMessage)
+
+// PATCH /api/messages/:messageId/pin  (toggle pin for current user)
+router.patch('/:messageId/pin', togglePinMessage)
+
+// PATCH /api/messages/:messageId/star  (toggle star for current user)
+router.patch('/:messageId/star', toggleStarMessage)
+
+// DELETE /api/messages/:messageId  (delete for me or for everyone)
+router.delete('/:messageId', deleteMessage)
+
+// POST /api/messages/:messageId/forward  (forward a message to another user)
+router.post('/:messageId/forward', forwardMessage)
 
 // GET /api/messages/:userId
 router.get('/:userId', getMessages)

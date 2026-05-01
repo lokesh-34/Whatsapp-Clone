@@ -33,6 +33,10 @@ export const getUnread        = ()               => API.get('/messages/unread')
 export const getScheduledMessages = (userId)    => API.get(`/messages/${userId}/scheduled`)
 export const cancelScheduledMessage = (messageId) => API.delete(`/messages/scheduled/${messageId}`)
 export const editMessage = (messageId, payload) => API.put(`/messages/${messageId}/edit`, payload)
+export const forwardMessage = (messageId, payload) => API.post(`/messages/${messageId}/forward`, payload)
+export const togglePinMessage = (messageId) => API.patch(`/messages/${messageId}/pin`)
+export const toggleStarMessage = (messageId) => API.patch(`/messages/${messageId}/star`)
+export const deleteMessage = (messageId, payload = {}) => API.delete(`/messages/${messageId}`, { data: payload })
 
 // ── E2EE public key exchange ─────────────────────────────────
 export const getPublicKey     = (userId)         => API.get(`/users/public-key/${userId}`)

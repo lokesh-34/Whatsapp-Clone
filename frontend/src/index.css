@@ -442,6 +442,78 @@ a:hover { text-decoration: underline; }
   background: rgba(255, 255, 255, 0.08);
 }
 
+.forward-msg-btn {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--wa-text-secondary);
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition), background var(--transition);
+}
+
+.bubble:hover .forward-msg-btn {
+  opacity: 1;
+}
+
+.forward-msg-btn:hover {
+  color: var(--wa-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bubble-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  margin-right: 2px;
+}
+
+.bubble-flag--pin { color: #f6c453; background: rgba(246, 196, 83, 0.12); }
+.bubble-flag--star { color: #ffd166; background: rgba(255, 209, 102, 0.12); }
+
+.message-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 180px;
+  background: #202c33;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.message-context-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--wa-text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.message-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.message-context-menu-item--danger {
+  color: #ff8b8b;
+}
+
+.message-context-menu-item--danger:hover {
+  background: rgba(241, 92, 109, 0.12);
+}
+
 .edited-label {
   font-size: 10px;
   color: var(--wa-text-muted);
