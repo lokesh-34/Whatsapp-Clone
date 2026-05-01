@@ -10,6 +10,7 @@ const {
   removeGroupMember,
   getGroupMessages,
   sendGroupMessage,
+  markGroupMessagesSeen,
 } = require('../controllers/groupController')
 const { protect } = require('../middlewares/auth')
 
@@ -40,6 +41,9 @@ router.get('/:groupId/messages', getGroupMessages)
 
 // POST /api/groups/:groupId/messages
 router.post('/:groupId/messages', sendGroupMessage)
+
+// POST /api/groups/:groupId/seen
+router.post('/:groupId/seen', markGroupMessagesSeen)
 
 // DELETE /api/groups/:groupId/members
 router.delete('/:groupId/members', removeGroupMembers)

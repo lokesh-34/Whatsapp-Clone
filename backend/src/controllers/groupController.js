@@ -28,6 +28,10 @@ const populateGroup = (query) => query
   .populate('members', GROUP_USER_FIELDS)
   .populate('admins', GROUP_USER_FIELDS)
 
+const populateGroupMessage = (query) => query
+  .populate('sender', GROUP_USER_FIELDS)
+  .populate('seenBy.user', GROUP_USER_FIELDS)
+
 const canManageGroup = (group, userId) => {
   const currentUserId = toIdString(userId)
   return toIdString(group.createdBy) === currentUserId || group.admins.some((adminId) => toIdString(adminId) === currentUserId)
@@ -192,6 +196,7 @@ const getGroupMessages = async (req, res, next) => {
       deletedFor: { $ne: req.user._id },
     })
       .populate('sender', GROUP_USER_FIELDS)
+      .populate('seenBy.user', GROUP_USER_FIELDS)
       .sort({ createdAt: 1 })
 
     res.status(200).json({ success: true, count: messages.length, messages })
@@ -231,11 +236,47 @@ const sendGroupMessage = async (req, res, next) => {
       attachmentMeta: attachmentMeta || null,
       sentAt: new Date(),
       scheduledStatus: 'sent',
+      seenBy: [],
     })
 
-    await message.populate('sender', GROUP_USER_FIELDS)
+    await populateGroupMessage(message)
 
     res.status(201).json({ success: true, message })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// POST /api/groups/:groupId/seen
+const markGroupMessagesSeen = async (req, res, next) => {
+  try {
+    const { groupId } = req.params
+    if (!isValidGroupId(groupId)) {
+      return res.status(404).json({ success: false, message: 'Group not found.' })
+    }
+
+    const group = await Group.findById(groupId).select('_id members')
+    if (!group) return res.status(404).json({ success: false, message: 'Group not found.' })
+
+    const isMember = group.members.some((member) => toIdString(member) === toIdString(req.user._id))
+    if (!isMember) return res.status(404).json({ success: false, message: 'Group not found.' })
+
+    const unreadMessages = await Message.find({
+      group: groupId,
+      sender: { $ne: req.user._id },
+      deletedFor: { $ne: req.user._id },
+      'seenBy.user': { $ne: req.user._id },
+    }).select('_id seenBy')
+
+    const seenAt = new Date()
+    await Promise.all(unreadMessages.map(async (message) => {
+      message.seenBy = [...(message.seenBy || []), { user: req.user._id, seenAt }]
+      await message.save()
+    }))
+
+    const populatedMessages = unreadMessages.map((message) => message.toObject())
+
+    res.status(200).json({ success: true, count: populatedMessages.length, messages: populatedMessages })
   } catch (error) {
     next(error)
   }
@@ -363,4 +404,5 @@ module.exports = {
   removeGroupMember,
   getGroupMessages,
   sendGroupMessage,
+  markGroupMessagesSeen,
 }

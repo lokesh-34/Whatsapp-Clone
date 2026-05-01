@@ -104,6 +104,22 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    seenBy: {
+      type: [
+        {
+          user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+          },
+          seenAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

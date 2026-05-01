@@ -177,6 +177,44 @@ const socketHandler = (io) => {
       }
     })
 
+    socket.on('groupMessagesRead', async ({ groupId }) => {
+      try {
+        if (!groupId) return
+
+        const group = await Group.findById(groupId).select('_id members')
+        if (!group) return
+
+        const isMember = group.members.some((memberId) => memberId.toString() === userId)
+        if (!isMember) return
+
+        const now = new Date()
+        const unreadMessages = await Message.find({
+          group: groupId,
+          sender: { $ne: userId },
+          deletedFor: { $ne: userId },
+          'seenBy.user': { $ne: userId },
+        })
+
+        if (!unreadMessages.length) return
+
+        await Promise.all(unreadMessages.map(async (message) => {
+          message.seenBy = [...(message.seenBy || []), { user: userId, seenAt: now }]
+          await message.save()
+        }))
+
+        const payload = {
+          groupId,
+          userId,
+          seenAt: now,
+          messageIds: unreadMessages.map((message) => message._id),
+        }
+
+        io.to(`group:${groupId.toString()}`).emit('groupMessageSeen', payload)
+      } catch (error) {
+        console.error('groupMessagesRead error:', error.message)
+      }
+    })
+
     // ── Typing indicators ────────────────────────────────────
     socket.on('typing', ({ to, groupId }) => {
       if (groupId) {

@@ -34,6 +34,44 @@ const groupSchema = new mongoose.Schema(
       ref: 'User',
       default: [],
     },
+    encryption: {
+      scheme: {
+        type: String,
+        enum: ['sender-key'],
+        default: 'sender-key',
+      },
+      senderKeyId: {
+        type: String,
+        default: null,
+      },
+      senderKeyVersion: {
+        type: Number,
+        default: 1,
+      },
+      memberKeyWraps: {
+        type: [
+          {
+            user: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: 'User',
+            },
+            wrappedKey: {
+              type: String,
+              default: null,
+            },
+            keyVersion: {
+              type: Number,
+              default: 1,
+            },
+            updatedAt: {
+              type: Date,
+              default: Date.now,
+            },
+          },
+        ],
+        default: [],
+      },
+    },
   },
   {
     timestamps: true,
