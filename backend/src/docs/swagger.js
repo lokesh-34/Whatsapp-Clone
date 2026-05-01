@@ -15,6 +15,7 @@ const swaggerSpec = {
     { name: 'Health', description: 'Health and status endpoints' },
     { name: 'Auth', description: 'Authentication and account endpoints' },
     { name: 'Users', description: 'User lookup and profile endpoints' },
+    { name: 'Groups', description: 'Group creation and membership management' },
     { name: 'Messages', description: 'Messaging endpoints' },
   ],
   components: {
@@ -64,6 +65,52 @@ const swaggerSpec = {
           avatar: { type: 'string', nullable: true, example: 'https://example.com/avatar.png' },
           isOnline: { type: 'boolean', example: true },
           lastSeen: { type: 'string', format: 'date-time', nullable: true },
+        },
+      },
+      Group: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string', example: '665f6c1e7d1f8b0012345678' },
+          name: { type: 'string', example: 'Weekend Trip Planning' },
+          description: { type: 'string', example: 'Planning the Goa trip' },
+          avatar: { type: 'string', nullable: true, example: null },
+          createdBy: { $ref: '#/components/schemas/PublicUser' },
+          members: { type: 'array', items: { $ref: '#/components/schemas/PublicUser' } },
+          admins: { type: 'array', items: { $ref: '#/components/schemas/PublicUser' } },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      GroupCreateRequest: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string', example: 'Weekend Trip Planning' },
+          description: { type: 'string', example: 'Planning the Goa trip' },
+          avatar: { type: 'string', nullable: true, example: null },
+          memberIds: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['665f6c1e7d1f8b0012345678', '665f6c1e7d1f8b0012345679'],
+          },
+        },
+      },
+      GroupRenameRequest: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string', example: 'New Group Name' },
+        },
+      },
+      GroupMembersRequest: {
+        type: 'object',
+        required: ['memberIds'],
+        properties: {
+          memberIds: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['665f6c1e7d1f8b0012345678', '665f6c1e7d1f8b0012345679'],
+          },
         },
       },
       LoginResponse: {
@@ -488,6 +535,208 @@ const swaggerSpec = {
         responses: {
           200: { description: 'Push token registered' },
           400: { description: 'Missing token' },
+        },
+      },
+    },
+    '/api/groups': {
+      get: {
+        tags: ['Groups'],
+        summary: 'List groups I belong to',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Groups list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    count: { type: 'integer', example: 2 },
+                    groups: { type: 'array', items: { $ref: '#/components/schemas/Group' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Groups'],
+        summary: 'Create a new group',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/GroupCreateRequest' } },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Group created',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    group: { $ref: '#/components/schemas/Group' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Validation error' },
+          404: { description: 'One or more members not found' },
+        },
+      },
+    },
+    '/api/groups/{groupId}': {
+      get: {
+        tags: ['Groups'],
+        summary: 'Get a group by ID',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Group details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    group: { $ref: '#/components/schemas/Group' },
+                  },
+                },
+              },
+            },
+          },
+          404: { description: 'Group not found' },
+        },
+      },
+      patch: {
+        tags: ['Groups'],
+        summary: 'Edit group name',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/GroupRenameRequest' } },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Group renamed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    group: { $ref: '#/components/schemas/Group' },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Only admins can rename the group' },
+          404: { description: 'Group not found' },
+        },
+      },
+    },
+    '/api/groups/{groupId}/members': {
+      post: {
+        tags: ['Groups'],
+        summary: 'Add members to a group',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/GroupMembersRequest' } },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Members added',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    added: { type: 'integer', example: 2 },
+                    group: { $ref: '#/components/schemas/Group' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Validation error' },
+          403: { description: 'Only admins can add members' },
+          404: { description: 'Group or users not found' },
+        },
+      },
+      delete: {
+        tags: ['Groups'],
+        summary: 'Remove members from a group in bulk',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/GroupMembersRequest' } },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Members removed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    removed: { type: 'integer', example: 1 },
+                    group: { $ref: '#/components/schemas/Group' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Validation or creator removal error' },
+          403: { description: 'Only admins can remove members' },
+          404: { description: 'Group or users not found' },
         },
       },
     },

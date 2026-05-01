@@ -39,6 +39,15 @@ export const togglePinMessage = (messageId) => API.patch(`/messages/${messageId}
 export const toggleStarMessage = (messageId) => API.patch(`/messages/${messageId}/star`)
 export const deleteMessage = (messageId, payload = {}) => API.delete(`/messages/${messageId}`, { data: payload })
 
+// ── Groups ───────────────────────────────────────────────────
+export const getGroups = ()                    => API.get('/groups')
+export const getGroupById = (groupId)          => API.get(`/groups/${groupId}`)
+export const createGroup = (payload)           => API.post('/groups', payload)
+export const renameGroup = (groupId, payload)  => API.patch(`/groups/${groupId}`, payload)
+export const addGroupMembers = (groupId, payload) => API.post(`/groups/${groupId}/members`, payload)
+export const removeGroupMembers = (groupId, payload) => API.delete(`/groups/${groupId}/members`, { data: payload })
+export const removeGroupMember = (groupId, memberId) => API.delete(`/groups/${groupId}/members/${memberId}`)
+
 // ── E2EE public key exchange ─────────────────────────────────
 export const getPublicKey     = (userId)         => API.get(`/users/public-key/${userId}`)
 export const postPublicKey    = (publicKey)      => API.post('/users/public-key', { publicKey })
