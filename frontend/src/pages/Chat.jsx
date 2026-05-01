@@ -5,7 +5,8 @@ import Sidebar       from '../components/Sidebar/Sidebar'
 import ChatWindow    from '../components/ChatWindow/ChatWindow'
 import ScheduledList from '../components/ChatWindow/ScheduledList'
 import StarredMessages from '../components/ChatWindow/StarredMessages'
-import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage } from '../api'
+import GroupManager from '../components/GroupManager/GroupManager'
+import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage, getGroups, getGroupMessages, sendGroupMessage } from '../api'
 import e2ee from '../lib/e2ee'
 
 /* ── Debounce hook ─────────────────────────────────────────── */
@@ -51,33 +52,65 @@ export default function Chat() {
   const [forwardUsers, setForwardUsers] = useState([])
   const [scheduledOpen, setScheduledOpen] = useState(false)
   const [starredOpen, setStarredOpen] = useState(false)
+  const [groupsOpen, setGroupsOpen] = useState(false)
 
   /* ─────────────────────────────────────────────────────────
      Load conversations on mount → populates sidebar from DB
   ───────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!user) return
-    getConversations()
-       .then(async ({ data }) => {
-         const conversations = data.conversations || []
-         const hydrated = await Promise.all(conversations.map(async (conv) => {
-           const lastMessage = conv.lastMessage
-           if (!lastMessage?.encryptedMessage) return conv
+    Promise.all([getConversations(), getGroups()])
+      .then(async ([conversationsRes, groupsRes]) => {
+        const conversations = conversationsRes?.data?.conversations || []
+        const groups = groupsRes?.data?.groups || []
 
-           try {
-             const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
-             
-             // Determine preview text based on message type
-             const previewContent = getPreviewText(lastMessage.messageType, content)
-             
-             return { ...conv, lastMessage: { ...lastMessage, content: previewContent } }
-           } catch (err) {
-             console.warn('Conversation preview decrypt failed:', err)
-             return { ...conv, lastMessage: { ...lastMessage, content: '[encrypted message]' } }
-           }
-         }))
+        const hydratedDirect = await Promise.all(conversations.map(async (conv) => {
+          const lastMessage = conv.lastMessage
+          if (!lastMessage?.encryptedMessage) return { ...conv, isGroup: false }
 
-         setRecentChats(hydrated)
+          try {
+            const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
+            const previewContent = getPreviewText(lastMessage.messageType, content)
+            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: previewContent } }
+          } catch (err) {
+            console.warn('Conversation preview decrypt failed:', err)
+            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: '[encrypted message]' } }
+          }
+        }))
+
+        const hydratedGroups = groups.map((group) => {
+          const chatUserShape = {
+            _id: group._id,
+            username: group.name,
+            avatarColor: '#22313a',
+            avatar: group.avatar || null,
+            isGroup: true,
+            description: group.description || '',
+            members: group.members || [],
+          }
+
+          const groupLast = group.lastMessage
+            ? {
+                ...group.lastMessage,
+                content: getPreviewText(group.lastMessage.messageType, group.lastMessage.encryptedMessage || ''),
+              }
+            : null
+
+          return {
+            user: chatUserShape,
+            lastMessage: groupLast,
+            unreadCount: group.unreadCount || 0,
+            isGroup: true,
+          }
+        })
+
+        const merged = [...hydratedDirect, ...hydratedGroups].sort((a, b) => {
+          const aTime = new Date(a.lastMessage?.sentAt || a.lastMessage?.createdAt || 0).getTime()
+          const bTime = new Date(b.lastMessage?.sentAt || b.lastMessage?.createdAt || 0).getTime()
+          return bTime - aTime
+        })
+
+        setRecentChats(merged)
       })
       .catch(err => console.error('Conversations error:', err))
   }, [user])
@@ -113,19 +146,22 @@ export default function Chat() {
     setLoadingMsgs(true)
     setMessages([])
 
-    getMessages(selectedUser._id)
+    const fetcher = selectedUser.isGroup ? getGroupMessages(selectedUser._id) : getMessages(selectedUser._id)
+    fetcher
       .then(async ({ data }) => {
         const incoming = data.messages || []
-        const decrypted = await Promise.all(incoming.map(async (msg) => {
-          if (!msg.encryptedMessage) return msg
-          try {
-            const content = await e2ee.decryptMessageObject(user._id, msg, selectedUser._id)
-            return { ...msg, content }
-          } catch (err) {
-            console.warn('Decrypt failed:', err)
-            return { ...msg, content: '[unable to decrypt]' }
-          }
-        }))
+        const decrypted = selectedUser.isGroup
+          ? incoming.map((msg) => ({ ...msg, content: msg.encryptedMessage }))
+          : await Promise.all(incoming.map(async (msg) => {
+            if (!msg.encryptedMessage) return msg
+            try {
+              const content = await e2ee.decryptMessageObject(user._id, msg, selectedUser._id)
+              return { ...msg, content }
+            } catch (err) {
+              console.warn('Decrypt failed:', err)
+              return { ...msg, content: '[unable to decrypt]' }
+            }
+          }))
 
         setMessages(decrypted)
         // Clear unread badge
@@ -136,7 +172,9 @@ export default function Chat() {
         )
 
         // Notify the sender that messages in this chat were read
-        socket?.emit('messagesRead', { from: selectedUser._id })
+        if (!selectedUser.isGroup) {
+          socket?.emit('messagesRead', { from: selectedUser._id })
+        }
       })
       .catch(err => console.error('Messages error:', err))
       .finally(() => setLoadingMsgs(false))
@@ -187,38 +225,68 @@ export default function Chat() {
     }
 
     try {
-      const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
-
-      if (socket) {
-        socket.emit('sendMessage', { 
-          to: selectedUser._id, 
-          ...payload,
-          messageType,
-          voiceDuration: metadata.duration || null,
-          scheduledFor: metadata.scheduledFor || null,
-          attachmentMeta: metadata.attachmentMeta || null,
-        }, (res) => {
-          if (res?.success) {
-            const sentMessage = { ...res.message, content, messageType }
-            setMessages(prev => [...prev, sentMessage])
-            const sidebarPreview = getPreviewText(messageType, content)
-            updateRecent(sentMessage, sidebarPreview)
-          } else {
-            console.error('Send failed:', res?.error || 'Unknown socket error')
-          }
-        })
+      if (selectedUser.isGroup) {
+        if (socket) {
+          socket.emit('sendGroupMessage', {
+            groupId: selectedUser._id,
+            content,
+            messageType,
+            voiceDuration: metadata.duration || null,
+            attachmentMeta: metadata.attachmentMeta || null,
+          }, (res) => {
+            if (res?.success) {
+              const sentMessage = { ...res.message, content, messageType }
+              setMessages(prev => [...prev, sentMessage])
+              updateRecent(sentMessage, getPreviewText(messageType, content))
+            } else {
+              console.error('Group send failed:', res?.error || 'Unknown socket error')
+            }
+          })
+        } else {
+          const { data } = await sendGroupMessage(selectedUser._id, {
+            content,
+            messageType,
+            voiceDuration: metadata.duration || null,
+            attachmentMeta: metadata.attachmentMeta || null,
+          })
+          const sentMessage = { ...data.message, content, messageType }
+          setMessages(prev => [...prev, sentMessage])
+          updateRecent(sentMessage, getPreviewText(messageType, content))
+        }
       } else {
-        const { data } = await sendMessage(selectedUser._id, {
-          ...payload,
-          scheduledFor: metadata.scheduledFor || null,
-          messageType,
-          voiceDuration: metadata.duration || null,
-          attachmentMeta: metadata.attachmentMeta || null,
-        })
-        const sentMessage = { ...data.message, content, messageType }
-        setMessages(prev => [...prev, sentMessage])
-        const sidebarPreview = getPreviewText(messageType, content)
-        updateRecent(sentMessage, sidebarPreview)
+        const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
+
+        if (socket) {
+          socket.emit('sendMessage', { 
+            to: selectedUser._id, 
+            ...payload,
+            messageType,
+            voiceDuration: metadata.duration || null,
+            scheduledFor: metadata.scheduledFor || null,
+            attachmentMeta: metadata.attachmentMeta || null,
+          }, (res) => {
+            if (res?.success) {
+              const sentMessage = { ...res.message, content, messageType }
+              setMessages(prev => [...prev, sentMessage])
+              const sidebarPreview = getPreviewText(messageType, content)
+              updateRecent(sentMessage, sidebarPreview)
+            } else {
+              console.error('Send failed:', res?.error || 'Unknown socket error')
+            }
+          })
+        } else {
+          const { data } = await sendMessage(selectedUser._id, {
+            ...payload,
+            scheduledFor: metadata.scheduledFor || null,
+            messageType,
+            voiceDuration: metadata.duration || null,
+            attachmentMeta: metadata.attachmentMeta || null,
+          })
+          const sentMessage = { ...data.message, content, messageType }
+          setMessages(prev => [...prev, sentMessage])
+          const sidebarPreview = getPreviewText(messageType, content)
+          updateRecent(sentMessage, sidebarPreview)
+        }
       }
     } catch (err) {
       console.error('Encrypted send failed:', err)
@@ -278,6 +346,7 @@ export default function Chat() {
   }, [])
 
   const beginForward = useCallback(async (message) => {
+    if (selectedUser?.isGroup) return
     if (!message) return
     setForwardingMessage(message)
     try {
@@ -287,7 +356,7 @@ export default function Chat() {
       console.error('Failed to load forward recipients:', err)
       setForwardUsers([])
     }
-  }, [])
+  }, [selectedUser])
 
   const cancelForward = useCallback(() => {
     setForwardingMessage(null)
@@ -295,11 +364,19 @@ export default function Chat() {
 
   const openScheduledMessages = useCallback(() => {
     if (!selectedUser) return
+    setGroupsOpen(false)
     setScheduledOpen(true)
   }, [selectedUser])
 
   const openStarredMessages = useCallback(() => {
+    setGroupsOpen(false)
     setStarredOpen(true)
+  }, [])
+
+  const openGroupManager = useCallback(() => {
+    setStarredOpen(false)
+    setScheduledOpen(false)
+    setGroupsOpen(true)
   }, [])
 
   const handleForwardRecipientSelect = useCallback(async (recipient, message) => {
@@ -327,7 +404,7 @@ export default function Chat() {
     })
 
     setForwardingMessage(null)
-  }, [user, getPreviewText])
+  }, [user])
 
   /* ─────────────────────────────────────────────────────────
      Socket events — incoming messages, typing indicators
@@ -336,11 +413,17 @@ export default function Chat() {
     if (!socket) return
 
     const handleNewMessage = async (msg) => {
-      const senderId   = (msg.sender?._id || msg.sender).toString()
-      const isSelected = selectedUser && senderId === selectedUser._id.toString()
+      const senderId = (msg.sender?._id || msg.sender)?.toString?.()
+      const isGroupMessage = Boolean(msg.group)
+      const activeGroup = selectedUser?.isGroup ? selectedUser._id?.toString?.() : null
+      const isSelected = isGroupMessage
+        ? activeGroup && msg.group.toString() === activeGroup
+        : selectedUser && senderId === selectedUser._id.toString()
 
       let displayMsg = msg
-      if (msg.encryptedMessage) {
+      if (isGroupMessage) {
+        displayMsg = { ...msg, content: msg.encryptedMessage }
+      } else if (msg.encryptedMessage) {
         try {
           const content = await e2ee.decryptMessageObject(user._id, msg, senderId)
           displayMsg = { ...msg, content }
@@ -353,12 +436,13 @@ export default function Chat() {
 
       // Update sidebar — bump unread count if chat not open
       setRecentChats(prev => {
-        const exists   = prev.find(c => c.user._id.toString() === senderId)
+        const targetId = isGroupMessage ? msg.group.toString() : senderId
+        const exists = prev.find(c => c.user._id.toString() === targetId)
         
         // Determine preview text based on message type
         const sidebarPreview = getPreviewText(msg.messageType, displayMsg.content)
         
-        const newLast  = {
+        const newLast = {
           content:   sidebarPreview,
           createdAt: msg.createdAt,
           sender:    msg.sender?._id || msg.sender,
@@ -369,9 +453,9 @@ export default function Chat() {
             {
               ...exists,
               lastMessage: newLast,
-              unreadCount: isSelected ? 0 : (exists.unreadCount || 0) + 1,
+              unreadCount: isSelected || isGroupMessage ? (exists.unreadCount || 0) : (exists.unreadCount || 0) + 1,
             },
-            ...prev.filter(c => c.user._id.toString() !== senderId),
+            ...prev.filter(c => c.user._id.toString() !== targetId),
           ]
         }
         return prev   // new sender — will appear after next conversations load
@@ -563,6 +647,7 @@ export default function Chat() {
         onLogout={logout}
         onOpenStarred={openStarredMessages}
         onOpenScheduled={openScheduledMessages}
+        onOpenGroups={openGroupManager}
         isOnline={isOnline}
         searchQuery={searchQuery}
         onSearch={setSearch}
@@ -587,6 +672,7 @@ export default function Chat() {
         onForwardRequest={beginForward}
         onMessageUpdate={handleMessageUpdate}
         onMessageRemove={handleMessageRemove}
+        onCreateGroup={openGroupManager}
         scheduledOpen={scheduledOpen}
         onOpenScheduled={openScheduledMessages}
         onCloseScheduled={() => setScheduledOpen(false)}
@@ -596,6 +682,11 @@ export default function Chat() {
         onClose={() => setStarredOpen(false)}
         currentUser={user}
         onOpenChat={handleSelectUser}
+      />
+      <GroupManager
+        open={groupsOpen}
+        onClose={() => setGroupsOpen(false)}
+        currentUser={user}
       />
       <ScheduledList
         open={scheduledOpen && Boolean(selectedUser)}

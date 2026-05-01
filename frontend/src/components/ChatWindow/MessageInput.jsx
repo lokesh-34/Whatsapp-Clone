@@ -114,11 +114,22 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
   const handleChange = (e) => {
     setText(e.target.value)
     if (socket && selectedUser) {
-      if (!typing) { setTyping(true); socket.emit('typing', { to: selectedUser._id }) }
+      if (!typing) {
+        setTyping(true)
+        if (selectedUser.isGroup) {
+          socket.emit('typing', { groupId: selectedUser._id })
+        } else {
+          socket.emit('typing', { to: selectedUser._id })
+        }
+      }
       clearTimeout(typingTimer.current)
       typingTimer.current = setTimeout(() => {
         setTyping(false)
-        socket.emit('stopTyping', { to: selectedUser._id })
+        if (selectedUser.isGroup) {
+          socket.emit('stopTyping', { groupId: selectedUser._id })
+        } else {
+          socket.emit('stopTyping', { to: selectedUser._id })
+        }
       }, 1500)
     }
   }
@@ -133,11 +144,16 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
     clearTimeout(typingTimer.current)
     if (typing && socket && selectedUser) {
       setTyping(false)
-      socket.emit('stopTyping', { to: selectedUser._id })
+      if (selectedUser.isGroup) {
+        socket.emit('stopTyping', { groupId: selectedUser._id })
+      } else {
+        socket.emit('stopTyping', { to: selectedUser._id })
+      }
     }
   }
 
   const handleScheduleSend = () => {
+    if (selectedUser?.isGroup) return
     if (!text.trim()) return
     const scheduledDate = new Date(scheduledFor)
     if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) return
@@ -438,7 +454,7 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
           <div className="input-actions">
             {hasText || editingMessage ? (
               <>
-                {!editingMessage && (
+                {!editingMessage && !selectedUser?.isGroup && (
                   <div className="schedule-wrap">
                     <motion.button
                       className="action-btn schedule-btn"

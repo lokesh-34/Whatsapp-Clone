@@ -8,6 +8,8 @@ const {
   addGroupMembers,
   removeGroupMembers,
   removeGroupMember,
+  getGroupMessages,
+  sendGroupMessage,
 } = require('../controllers/groupController')
 const { protect } = require('../middlewares/auth')
 
@@ -33,6 +35,12 @@ router.post(
   addGroupMembers
 )
 
+// GET /api/groups/:groupId/messages
+router.get('/:groupId/messages', getGroupMessages)
+
+// POST /api/groups/:groupId/messages
+router.post('/:groupId/messages', sendGroupMessage)
+
 // DELETE /api/groups/:groupId/members
 router.delete('/:groupId/members', removeGroupMembers)
 
@@ -42,9 +50,7 @@ router.delete('/:groupId/members/:memberId', removeGroupMember)
 // PATCH /api/groups/:groupId
 router.patch(
   '/:groupId',
-  [
-    body('name').trim().notEmpty().withMessage('Group name is required.').isLength({ min: 1, max: 80 }).withMessage('Group name must be 1-80 characters.'),
-  ],
+  [],
   renameGroup
 )
 

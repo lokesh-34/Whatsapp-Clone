@@ -47,6 +47,8 @@ export const renameGroup = (groupId, payload)  => API.patch(`/groups/${groupId}`
 export const addGroupMembers = (groupId, payload) => API.post(`/groups/${groupId}/members`, payload)
 export const removeGroupMembers = (groupId, payload) => API.delete(`/groups/${groupId}/members`, { data: payload })
 export const removeGroupMember = (groupId, memberId) => API.delete(`/groups/${groupId}/members/${memberId}`)
+export const getGroupMessages = (groupId)      => API.get(`/groups/${groupId}/messages`)
+export const sendGroupMessage = (groupId, payload) => API.post(`/groups/${groupId}/messages`, payload)
 
 // ── E2EE public key exchange ─────────────────────────────────
 export const getPublicKey     = (userId)         => API.get(`/users/public-key/${userId}`)

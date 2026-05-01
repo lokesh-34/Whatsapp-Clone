@@ -10,7 +10,14 @@ const messageSchema = new mongoose.Schema(
     receiver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Receiver is required'],
+      required: function () {
+        return !this.group
+      },
+    },
+    group: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      default: null,
     },
     // Encrypted content (server never stores plaintext)
     encryptedMessage: {
@@ -105,6 +112,7 @@ const messageSchema = new mongoose.Schema(
 
 // Indexes for fast conversation and unread queries
 messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 })
+messageSchema.index({ group: 1, createdAt: -1 })
 messageSchema.index({ receiver: 1, read: 1 })
 messageSchema.index({ scheduledStatus: 1, scheduledFor: 1 })
 

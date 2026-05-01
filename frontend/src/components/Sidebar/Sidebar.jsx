@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
-import { Menu, Clock3, Star, LogOut } from 'lucide-react'
+import { Menu, Clock3, Star, LogOut, Users } from 'lucide-react'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import ShinyText    from '../bits/ShinyText'
 import GradientText from '../bits/GradientText'
@@ -171,7 +171,7 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
 // ── Main Sidebar ─────────────────────────────────────────────
 export default function Sidebar({
   currentUser, conversations, selectedUser, onSelectUser,
-  onLogout, onOpenStarred, onOpenScheduled, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
+  onLogout, onOpenStarred, onOpenScheduled, onOpenGroups, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
   const showEmpty = conversations.length === 0
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
   const [menuOpen, setMenuOpen] = useState(false)
@@ -227,6 +227,9 @@ export default function Sidebar({
               >
                 <button type="button" className="sidebar-menu-item" onClick={() => { setMenuOpen(false); onOpenStarred?.() }}>
                   <Star size={16} /> Starred messages
+                </button>
+                <button type="button" className="sidebar-menu-item" onClick={() => { setMenuOpen(false); onOpenGroups?.() }}>
+                  <Users size={16} /> Groups
                 </button>
                 <button type="button" className="sidebar-menu-item" onClick={() => { setMenuOpen(false); onOpenScheduled?.() }} disabled={!selectedUser} title={!selectedUser ? 'Open a chat first' : 'Scheduled messages'}>
                   <Clock3 size={16} /> Scheduled messages

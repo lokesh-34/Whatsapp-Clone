@@ -740,6 +740,88 @@ const swaggerSpec = {
         },
       },
     },
+    '/api/groups/{groupId}/messages': {
+      get: {
+        tags: ['Groups'],
+        summary: 'Get group chat messages',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Group message list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    count: { type: 'integer', example: 14 },
+                    messages: { type: 'array', items: { $ref: '#/components/schemas/Message' } },
+                  },
+                },
+              },
+            },
+          },
+          404: { description: 'Group not found' },
+        },
+      },
+      post: {
+        tags: ['Groups'],
+        summary: 'Send a message to a group',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'groupId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['content'],
+                properties: {
+                  content: { type: 'string', example: 'Hello team!' },
+                  messageType: { type: 'string', example: 'text' },
+                  voiceDuration: { type: 'number', nullable: true },
+                  attachmentMeta: { $ref: '#/components/schemas/AttachmentMeta' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Group message sent',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { $ref: '#/components/schemas/Message' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Validation error' },
+          403: { description: 'Only members can send to the group' },
+          404: { description: 'Group not found' },
+        },
+      },
+    },
     '/api/messages/conversations': {
       get: {
         tags: ['Messages'],

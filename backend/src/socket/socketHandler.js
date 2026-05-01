@@ -1,6 +1,7 @@
 const jwt  = require('jsonwebtoken')
 const User = require('../models/User')
 const Message = require('../models/Message')
+const Group = require('../models/Group')
 const { sendPushNotification } = require('../services/pushNotifications')
 
 // userId → Set<socketId>  (one user may have multiple tabs)
@@ -53,6 +54,16 @@ const socketHandler = (io) => {
     io.emit('onlineUsers', getOnlineUserIds())
 
     socket.join(userId)
+
+    // Join all group rooms for this user
+    try {
+      const groups = await Group.find({ members: socket.user._id }).select('_id').lean()
+      groups.forEach((group) => {
+        socket.join(`group:${group._id.toString()}`)
+      })
+    } catch (error) {
+      console.error('Failed to join group rooms:', error.message)
+    }
 
     // ── sendMessage ─────────────────────────────────────────
     socket.on('sendMessage', async (data, callback) => {
@@ -121,9 +132,67 @@ const socketHandler = (io) => {
       }
     })
 
+    // ── sendGroupMessage ───────────────────────────────────
+    socket.on('sendGroupMessage', async (data, callback) => {
+      try {
+        const { groupId, content, messageType = 'text', voiceDuration = null, attachmentMeta = null } = data || {}
+        if (!groupId || !content?.toString?.().trim?.()) {
+          return callback?.({ success: false, error: 'Invalid group message data.' })
+        }
+
+        const group = await Group.findById(groupId).select('_id members')
+        if (!group) {
+          return callback?.({ success: false, error: 'Group not found.' })
+        }
+
+        const isMember = group.members.some((memberId) => memberId.toString() === userId)
+        if (!isMember) {
+          return callback?.({ success: false, error: 'You are not a member of this group.' })
+        }
+
+        const message = await Message.create({
+          sender: userId,
+          receiver: null,
+          group: groupId,
+          encryptedMessage: content,
+          iv: 'group',
+          encryptedKey: null,
+          messageType,
+          voiceDuration: messageType === 'voice' ? voiceDuration : null,
+          attachmentMeta: attachmentMeta || null,
+          sentAt: new Date(),
+          scheduledStatus: 'sent',
+        })
+
+        await message.populate('sender', 'username avatarColor avatar')
+
+        const messageObj = message.toObject()
+
+        io.to(`group:${groupId.toString()}`).emit('newMessage', messageObj)
+
+        callback?.({ success: true, message: messageObj })
+      } catch (error) {
+        console.error('Socket sendGroupMessage error:', error.message)
+        callback?.({ success: false, error: 'Failed to send group message.' })
+      }
+    })
+
     // ── Typing indicators ────────────────────────────────────
-    socket.on('typing',     ({ to }) => to && socket.to(to).emit('userTyping',        { from: userId }))
-    socket.on('stopTyping', ({ to }) => to && socket.to(to).emit('userStoppedTyping', { from: userId }))
+    socket.on('typing', ({ to, groupId }) => {
+      if (groupId) {
+        socket.to(`group:${groupId}`).emit('userTyping', { from: userId, groupId })
+        return
+      }
+      if (to) socket.to(to).emit('userTyping', { from: userId })
+    })
+
+    socket.on('stopTyping', ({ to, groupId }) => {
+      if (groupId) {
+        socket.to(`group:${groupId}`).emit('userStoppedTyping', { from: userId, groupId })
+        return
+      }
+      if (to) socket.to(to).emit('userStoppedTyping', { from: userId })
+    })
 
     socket.on('messagesRead', async ({ from }) => {
       try {

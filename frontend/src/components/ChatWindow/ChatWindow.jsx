@@ -10,7 +10,7 @@ import GradientText from '../bits/GradientText'
 import ShinyText from '../bits/ShinyText'
 import ForwardDialog from '../ForwardDialog'
 
-export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove, onOpenScheduled }) {
+export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove, onOpenScheduled, onCreateGroup }) {
   const [editingMessage, setEditingMessage] = useState(null)
   const emptyRef = useRef(null)
 
@@ -54,6 +54,14 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
             <div className="empty-state-badge" style={{ opacity: 0 }}>
               <ShinyText text="🔒  End-to-end encrypted" color="#00A884" shineColor="#4ECDC4" speed={5} />
             </div>
+            <button
+              type="button"
+              className="empty-state-create-group-btn"
+              onClick={onCreateGroup}
+              style={{ marginTop: 16 }}
+            >
+              + Create group
+            </button>
           </div>
         </SpotlightCard>
       </main>
@@ -93,10 +101,12 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
         <div className="chat-header-avatar-wrap">
           <Avatar style={{ background: selectedUser.avatarColor, width: 44, height: 44 }}>
             <AvatarFallback style={{ background: selectedUser.avatarColor, color: '#fff', fontSize: 18, fontWeight: 700 }}>
-              {selectedUser.username[0].toUpperCase()}
+              {selectedUser.avatar
+                ? <img src={selectedUser.avatar} alt={selectedUser.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                : selectedUser.username[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className={`online-dot ${isOnline(selectedUser._id) ? 'online-dot--on' : ''}`} />
+          {!selectedUser.isGroup && <span className={`online-dot ${isOnline(selectedUser._id) ? 'online-dot--on' : ''}`} />}
         </div>
         <div className="chat-header-info">
           <span className="chat-header-name">{selectedUser.username}</span>
@@ -107,14 +117,16 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
           >
-            {isTyping
-              ? <span style={{ color: 'var(--wa-green)' }}>typing…</span>
-              : isOnline(selectedUser._id) ? 'Online' : 'Last seen recently'
+            {selectedUser.isGroup
+              ? `${selectedUser.members?.length || 0} members`
+              : isTyping
+                ? <span style={{ color: 'var(--wa-green)' }}>typing…</span>
+                : isOnline(selectedUser._id) ? 'Online' : 'Last seen recently'
             }
           </motion.span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="icon-btn" title="Scheduled messages" onClick={onOpenScheduled}>⏰</button>
+          {!selectedUser.isGroup && <button className="icon-btn" title="Scheduled messages" onClick={onOpenScheduled}>⏰</button>}
         </div>
       </motion.div>
 

@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator')
 const mongoose = require('mongoose')
 const Group = require('../models/Group')
 const User = require('../models/User')
+const Message = require('../models/Message')
 
 const GROUP_USER_FIELDS = '_id username email avatarColor isOnline lastSeen avatar'
 
@@ -43,6 +44,13 @@ const getMissingUserIds = async (userIds) => {
 
 const formatGroupResponse = (group) => group.toObject ? group.toObject() : group
 
+const getLastGroupMessage = async (groupId, userId) => Message.findOne({
+  group: groupId,
+  deletedFor: { $ne: userId },
+})
+  .populate('sender', 'username avatarColor avatar')
+  .sort({ createdAt: -1 })
+
 // GET /api/groups
 const getMyGroups = async (req, res, next) => {
   try {
@@ -50,7 +58,16 @@ const getMyGroups = async (req, res, next) => {
       Group.find({ members: req.user._id }).sort({ updatedAt: -1, createdAt: -1 })
     )
 
-    res.status(200).json({ success: true, count: groups.length, groups })
+    const groupsWithPreview = await Promise.all(groups.map(async (group) => {
+      const lastMessage = await getLastGroupMessage(group._id, req.user._id)
+      return {
+        ...group.toObject(),
+        lastMessage: lastMessage ? lastMessage.toObject() : null,
+        unreadCount: 0,
+      }
+    }))
+
+    res.status(200).json({ success: true, count: groups.length, groups: groupsWithPreview })
   } catch (error) {
     next(error)
   }
@@ -126,7 +143,7 @@ const renameGroup = async (req, res, next) => {
       return res.status(400).json({ success: false, message: errors.array()[0].msg })
     }
 
-    const { name } = req.body
+    const { name, avatar } = req.body
     if (!isValidGroupId(req.params.groupId)) {
       return res.status(404).json({ success: false, message: 'Group not found.' })
     }
@@ -141,11 +158,84 @@ const renameGroup = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Only group admins can edit the group name.' })
     }
 
-    group.name = name.trim()
+    if (typeof name === 'string' && name.trim()) {
+      group.name = name.trim()
+    }
+    if (typeof avatar === 'string' || avatar === null) {
+      group.avatar = avatar
+    }
     await group.save()
 
     const populatedGroup = await populateGroup(Group.findById(group._id))
     res.status(200).json({ success: true, group: formatGroupResponse(populatedGroup) })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// GET /api/groups/:groupId/messages
+const getGroupMessages = async (req, res, next) => {
+  try {
+    const { groupId } = req.params
+    if (!isValidGroupId(groupId)) {
+      return res.status(404).json({ success: false, message: 'Group not found.' })
+    }
+
+    const group = await Group.findById(groupId).select('_id members')
+    if (!group) return res.status(404).json({ success: false, message: 'Group not found.' })
+
+    const isMember = group.members.some((member) => toIdString(member) === toIdString(req.user._id))
+    if (!isMember) return res.status(404).json({ success: false, message: 'Group not found.' })
+
+    const messages = await Message.find({
+      group: groupId,
+      deletedFor: { $ne: req.user._id },
+    })
+      .populate('sender', GROUP_USER_FIELDS)
+      .sort({ createdAt: 1 })
+
+    res.status(200).json({ success: true, count: messages.length, messages })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// POST /api/groups/:groupId/messages
+const sendGroupMessage = async (req, res, next) => {
+  try {
+    const { groupId } = req.params
+    const { content, messageType = 'text', voiceDuration = null, attachmentMeta = null } = req.body
+
+    if (!isValidGroupId(groupId)) {
+      return res.status(404).json({ success: false, message: 'Group not found.' })
+    }
+    if (!content?.toString?.().trim?.()) {
+      return res.status(400).json({ success: false, message: 'Message content is required.' })
+    }
+
+    const group = await Group.findById(groupId).select('_id members')
+    if (!group) return res.status(404).json({ success: false, message: 'Group not found.' })
+
+    const isMember = group.members.some((member) => toIdString(member) === toIdString(req.user._id))
+    if (!isMember) return res.status(403).json({ success: false, message: 'Only group members can send messages.' })
+
+    const message = await Message.create({
+      sender: req.user._id,
+      receiver: null,
+      group: groupId,
+      encryptedMessage: content,
+      iv: 'group',
+      encryptedKey: null,
+      messageType,
+      voiceDuration: messageType === 'voice' ? voiceDuration : null,
+      attachmentMeta: attachmentMeta || null,
+      sentAt: new Date(),
+      scheduledStatus: 'sent',
+    })
+
+    await message.populate('sender', GROUP_USER_FIELDS)
+
+    res.status(201).json({ success: true, message })
   } catch (error) {
     next(error)
   }
@@ -271,4 +361,6 @@ module.exports = {
   addGroupMembers,
   removeGroupMembers,
   removeGroupMember,
+  getGroupMessages,
+  sendGroupMessage,
 }
