@@ -174,6 +174,8 @@ export default function Chat() {
         // Notify the sender that messages in this chat were read
         if (!selectedUser.isGroup) {
           socket?.emit('messagesRead', { from: selectedUser._id })
+        } else {
+          socket?.emit('groupMessagesRead', { groupId: selectedUser._id })
         }
       })
       .catch(err => console.error('Messages error:', err))
@@ -579,6 +581,50 @@ export default function Chat() {
       }))
     }
 
+    const handleGroupMessageSeen = ({ groupId, userId, seenAt, messageIds = [] }) => {
+      if (!groupId || !userId) return
+
+      const seenEntry = {
+        user: {
+          _id: userId,
+          username: userId === user?._id ? user?.username : userId,
+        },
+        seenAt,
+      }
+
+      setMessages((prev) => prev.map((msg) => {
+        const msgGroupId = msg.group?._id?.toString?.() || msg.group?.toString?.() || msg.group
+        const msgId = msg._id?.toString?.() || msg._id
+        if (msgGroupId !== groupId.toString()) return msg
+        if (messageIds.length && !messageIds.map((id) => id.toString()).includes(msgId)) return msg
+
+        const existingSeenBy = Array.isArray(msg.seenBy) ? msg.seenBy : []
+        const hasSeenUser = existingSeenBy.some((entry) => (entry?.user?._id?.toString?.() || entry?.user?.toString?.()) === userId.toString())
+        if (hasSeenUser) return msg
+
+        return {
+          ...msg,
+          seenBy: [...existingSeenBy, seenEntry],
+        }
+      }))
+
+      setRecentChats((prev) => prev.map((conv) => {
+        if (conv.user._id?.toString?.() !== groupId.toString()) return conv
+        if (conv.lastMessage?._id && messageIds.length && !messageIds.map((id) => id.toString()).includes(conv.lastMessage._id.toString())) return conv
+
+        const existingSeenBy = Array.isArray(conv.lastMessage?.seenBy) ? conv.lastMessage.seenBy : []
+        const hasSeenUser = existingSeenBy.some((entry) => (entry?.user?._id?.toString?.() || entry?.user?.toString?.()) === userId.toString())
+        if (hasSeenUser) return conv
+
+        return {
+          ...conv,
+          lastMessage: conv.lastMessage
+            ? { ...conv.lastMessage, seenBy: [...existingSeenBy, seenEntry] }
+            : conv.lastMessage,
+        }
+      }))
+    }
+
     socket.on('newMessage',        handleNewMessage)
     socket.on('userTyping',        handleTyping)
     socket.on('userStoppedTyping', handleStopTyping)
@@ -587,6 +633,7 @@ export default function Chat() {
     socket.on('messagePinned', handleMessagePinned)
     socket.on('messageStarred', handleMessageStarred)
     socket.on('messageDeleted', handleMessageDeleted)
+    socket.on('groupMessageSeen', handleGroupMessageSeen)
 
     return () => {
       socket.off('newMessage',        handleNewMessage)
@@ -597,6 +644,7 @@ export default function Chat() {
       socket.off('messagePinned', handleMessagePinned)
       socket.off('messageStarred', handleMessageStarred)
       socket.off('messageDeleted', handleMessageDeleted)
+      socket.off('groupMessageSeen', handleGroupMessageSeen)
     }
   }, [socket, selectedUser, user])
 

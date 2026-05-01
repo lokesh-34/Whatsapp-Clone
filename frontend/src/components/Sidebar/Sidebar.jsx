@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
-import { Menu, Clock3, Star, LogOut, Users } from 'lucide-react'
+import { Menu, Plus, Clock3, Star, LogOut, Users } from 'lucide-react'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import ShinyText    from '../bits/ShinyText'
 import GradientText from '../bits/GradientText'
@@ -175,6 +175,7 @@ export default function Sidebar({
   const showEmpty = conversations.length === 0
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all')
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -187,24 +188,69 @@ export default function Sidebar({
     return () => document.removeEventListener('mousedown', closeMenu)
   }, [])
 
+  const getFilteredConversations = () => {
+    if (isSearchMode) return conversations
+    
+    switch (activeFilter) {
+      case 'unread':
+        return conversations.filter(conv => conv.unreadCount > 0)
+      case 'groups':
+        return conversations.filter(conv => conv.isGroup)
+      case 'favourites':
+        return conversations.filter(conv => conv.starred)
+      case 'all':
+      default:
+        return conversations
+    }
+  }
+
+  const displayConversations = getFilteredConversations()
+
   return (
     <aside className="sidebar">
       {/* Header */}
       <div className="sidebar-header">
-        <div className="sidebar-header-left">
-          <Avatar style={{ background: currentUser?.avatarColor, width: 36, height: 36 }}>
-            <AvatarFallback style={{ background: currentUser?.avatarColor, color: '#fff', fontSize: 14, fontWeight: 700 }}>
-              {currentUser?.avatar
-                ? <img src={currentUser.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                : currentUser?.username?.[0]?.toUpperCase()
-              }
-            </AvatarFallback>
-          </Avatar>
-          <span className="sidebar-username">
-            <ShinyText text={currentUser?.username || ''} color="#E9EDEF" shineColor="#fff" speed={6} />
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            type="button"
+            className="profile-icon-btn"
+            title="Profile"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              color: '#8696A0',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => { e.target.style.background = 'rgba(255,255,255,.08)'; e.target.style.color = '#E9EDEF' }}
+            onMouseLeave={(e) => { e.target.style.background = 'none'; e.target.style.color = '#8696A0' }}
+          >
+            <Avatar style={{ background: currentUser?.avatarColor, width: 32, height: 32 }}>
+              <AvatarFallback style={{ background: currentUser?.avatarColor, color: '#fff', fontSize: 12, fontWeight: 700 }}>
+                {currentUser?.avatar
+                  ? <img src={currentUser.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  : currentUser?.username?.[0]?.toUpperCase()
+                }
+              </AvatarFallback>
+            </Avatar>
+          </button>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#E9EDEF', margin: 0 }}>Chats</h1>
         </div>
-        <div className="sidebar-header-actions" ref={menuRef}>
+        <div className="sidebar-header-actions" ref={menuRef} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <motion.button
+            type="button"
+            className="icon-btn"
+            title="New chat"
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Plus size={20} />
+          </motion.button>
           <motion.button
             type="button"
             className="icon-btn"
@@ -275,15 +321,77 @@ export default function Sidebar({
         </motion.div>
       </div>
 
+      {/* Filter tabs */}
+      <div style={{
+        display: 'flex',
+        gap: 8,
+        padding: '8px 12px',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        scrollbarWidth: 'none',
+        WebkitScrollbar: 'none',
+      }}>
+        {[
+          { label: 'All', key: 'all' },
+          { label: 'Unread', key: 'unread' },
+          { label: 'Favourites', key: 'favourites' },
+          { label: 'Groups', key: 'groups' },
+        ].map((filter) => (
+          <motion.button
+            key={filter.key}
+            type="button"
+            onClick={() => setActiveFilter(filter.key)}
+            style={{
+              padding: '6px 16px',
+              borderRadius: '20px',
+              border: 'none',
+              background: activeFilter === filter.key ? 'rgba(0, 168, 132, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+              color: activeFilter === filter.key ? '#00A884' : '#8696A0',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+            whileHover={{ background: activeFilter === filter.key ? 'rgba(0, 168, 132, 0.3)' : 'rgba(255, 255, 255, 0.12)', color: '#E9EDEF' }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {filter.label}
+          </motion.button>
+        ))}
+        <motion.button
+          type="button"
+          style={{
+            padding: '6px 12px',
+            borderRadius: '20px',
+            border: 'none',
+            background: 'transparent',
+            color: '#8696A0',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            marginLeft: 'auto',
+          }}
+          whileHover={{ color: '#E9EDEF' }}
+          whileTap={{ scale: 0.95 }}
+        >
+          ▼
+        </motion.button>
+      </div>
+
       {/* Section label */}
       <AnimatePresence mode="wait">
-        {!showEmpty && (
+        {!showEmpty && displayConversations.length > 0 && (
           <motion.div key={isSearchMode ? 'res' : 'rec'}
             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             style={{ padding: '6px 16px 2px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}
           >
             <GradientText colors={['#8696A0', '#00A884', '#8696A0']} animationSpeed={14}>
-              {isSearchMode ? `Results (${conversations.length})` : 'Recent Chats'}
+              {isSearchMode ? `Results (${displayConversations.length})` : 'Recent Chats'}
             </GradientText>
           </motion.div>
         )}
@@ -292,12 +400,12 @@ export default function Sidebar({
       {/* List */}
       <div className="sidebar-list">
         <AnimatePresence mode="wait">
-          {showEmpty
+          {displayConversations.length === 0 && !isSearchMode
             ? <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <EmptyState isSearchMode={isSearchMode} searchLoading={searchLoading} query={searchQuery} />
               </motion.div>
             : <motion.div key="list">
-                {conversations.map((conv, idx) => (
+                {displayConversations.map((conv, idx) => (
                   <ConversationItem
                     key={conv.user._id}
                     conversation={{ ...conv, currentUserId }}

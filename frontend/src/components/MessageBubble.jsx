@@ -17,6 +17,20 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
   const isRead = Boolean(message.readAt || message.read)
   const isDelivered = Boolean(message.deliveredAt || isRead)
   const isScheduled = message.scheduledStatus === 'scheduled'
+  const seenByMembers = Array.isArray(message.seenBy)
+    ? message.seenBy
+        .map((entry) => entry?.user)
+        .filter(Boolean)
+        .reduce((unique, member) => {
+          const memberId = member?._id?.toString?.() || member?.toString?.() || member?.id
+          if (!memberId || unique.some((item) => (item._id?.toString?.() || item?.toString?.() || item?.id) === memberId)) return unique
+          unique.push(member)
+          return unique
+        }, [])
+    : []
+  const seenByLabel = seenByMembers.length
+    ? seenByMembers.map((member) => member?.username || member?.name || member?.fullName || 'Someone').join(', ')
+    : ''
 
   // Format duration
   const formatDuration = (seconds) => {
@@ -333,6 +347,11 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
             )}
             {showEdited && <span className="edited-label">edited</span>}
             <span className="bubble-time">{time}</span>
+            {isMine && Array.isArray(message.seenBy) && message.seenBy.length > 0 && (
+              <span className="bubble-seen-by" title={seenByLabel || 'Seen by group members'}>
+                Seen by {message.seenBy.length}
+              </span>
+            )}
             {isMine && (
               <span className="bubble-tick" title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
                 {isScheduled ? (
