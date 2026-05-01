@@ -65,10 +65,29 @@ export default function MessageInput({ onSend, selectedUser }) {
         event.preventDefault()
         handleStopVoiceRecord()
       }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        // Cancel and discard the recording
+        try { voiceRecorder.cancelRecording() } catch (e) { /* ignore */ }
+        setIsRecording(false)
+      }
     }
 
     window.addEventListener('keydown', handleRecordingKeyDown)
     return () => window.removeEventListener('keydown', handleRecordingKeyDown)
+  }, [isRecording])
+
+  // Global Escape handler to close pickers when not recording
+  useEffect(() => {
+    const handleGlobalEscape = (event) => {
+      if (event.key === 'Escape') {
+        if (isRecording) return // handled by recording handler
+        setShowEmojiPicker(false)
+        setShowSchedulePicker(false)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalEscape)
+    return () => window.removeEventListener('keydown', handleGlobalEscape)
   }, [isRecording])
 
   const handleChange = (e) => {

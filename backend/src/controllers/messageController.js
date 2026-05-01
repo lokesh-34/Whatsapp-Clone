@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator')
 const Message = require('../models/Message')
 const User    = require('../models/User')
 const { sendPushNotification } = require('../services/pushNotifications')
+const { getIO } = require('../socket/io')
 
 // ── GET /api/messages/conversations ─────────────────────────
 // Returns all users this person has chatted with, sorted by last message
@@ -178,4 +179,69 @@ const getUnreadCounts = async (req, res, next) => {
   }
 }
 
-module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts }
+// ── GET /api/messages/:userId/scheduled ───────────────────
+const getScheduledMessages = async (req, res, next) => {
+  try {
+    const { userId } = req.params
+    const myId = req.user._id
+
+    const otherUser = await User.findById(userId)
+    if (!otherUser) return res.status(404).json({ success: false, message: 'User not found.' })
+
+    const messages = await Message.find({ sender: myId, receiver: userId, scheduledStatus: 'scheduled' })
+      .populate('sender',   'username avatarColor avatar')
+      .populate('receiver', 'username avatarColor avatar')
+      .sort({ scheduledFor: 1 })
+
+    res.status(200).json({ success: true, count: messages.length, messages })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// ── DELETE /api/messages/scheduled/:messageId ────────────
+const cancelScheduledMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const myId = req.user._id
+
+    const message = await Message.findById(messageId)
+    if (!message) return res.status(404).json({ success: false, message: 'Message not found.' })
+
+    if (message.sender.toString() !== myId.toString())
+      return res.status(403).json({ success: false, message: 'Not authorized to cancel this message.' })
+
+    if (message.scheduledStatus !== 'scheduled')
+      return res.status(400).json({ success: false, message: 'Message is not scheduled or already processed.' })
+
+    message.scheduledStatus = 'cancelled'
+    await message.save()
+
+    // Emit socket updates if Socket.IO is available
+    try {
+      const io = getIO()
+      const payload = {
+        messageId: message._id,
+        senderId: message.sender,
+        receiverId: message.receiver,
+        scheduledStatus: message.scheduledStatus,
+        scheduledFor: message.scheduledFor || null,
+      }
+      if (io) {
+        io.to(message.sender.toString()).emit('messageStatusUpdated', payload)
+        io.to(message.receiver.toString()).emit('messageStatusUpdated', payload)
+        io.to(message.sender.toString()).emit('messageCancelled', payload)
+        io.to(message.receiver.toString()).emit('messageCancelled', payload)
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit cancellation event:', emitErr.message)
+    }
+
+    res.status(200).json({ success: true, message: 'Scheduled message cancelled.', data: { messageId: message._id } })
+  } catch (error) {
+    next(error)
+  }
+}
+
+module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage }
+

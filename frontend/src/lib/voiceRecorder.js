@@ -18,6 +18,7 @@ export class VoiceRecorder {
       this.startTime = Date.now()
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.stream = stream
       this.mediaRecorder = new MediaRecorder(stream)
 
       this.mediaRecorder.ondataavailable = (event) => {
@@ -27,9 +28,13 @@ export class VoiceRecorder {
       this.mediaRecorder.onstop = () => {
         const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' })
         const duration = (Date.now() - this.startTime) / 1000
-        this.convertBlobToBase64(audioBlob, duration)
+        // If onStopCallback was cleared (cancel), do not call it
+        if (this.onStopCallback) {
+          this.convertBlobToBase64(audioBlob, duration)
+        }
         // Stop the stream
-        stream.getTracks().forEach(track => track.stop())
+        if (this.stream) this.stream.getTracks().forEach(track => track.stop())
+        this.stream = null
       }
 
       this.mediaRecorder.start()
@@ -47,6 +52,26 @@ export class VoiceRecorder {
       this.mediaRecorder.stop()
       this.isRecording = false
     }
+  }
+
+  // Cancel recording and discard captured audio
+  cancelRecording() {
+    // Clear the onStop callback so onstop handler will not trigger send
+    this.onStopCallback = null
+    if (this.mediaRecorder && this.isRecording) {
+      try {
+        this.mediaRecorder.stop()
+      } catch (e) {
+        // ignore
+      }
+      this.isRecording = false
+    }
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop())
+      this.stream = null
+    }
+    this.audioChunks = []
+    this.startTime = null
   }
 
   convertBlobToBase64(blob, duration) {

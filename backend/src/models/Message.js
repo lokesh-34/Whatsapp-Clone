@@ -45,7 +45,7 @@ const messageSchema = new mongoose.Schema(
     },
     scheduledStatus: {
       type: String,
-      enum: ['sent', 'scheduled'],
+      enum: ['sent', 'scheduled', 'cancelled'],
       default: 'sent',
     },
     sentAt: {

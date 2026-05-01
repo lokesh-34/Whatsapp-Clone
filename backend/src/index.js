@@ -29,6 +29,10 @@ const io = new Server(httpServer, {
   pingTimeout: 60000,
 });
 
+// Make io available to controllers/services that may need to emit
+const { setIO } = require('./socket/io')
+setIO(io)
+
 // ─── Middlewares ─────────────────────────────────────────────────────────────
 app.use(
   cors({
