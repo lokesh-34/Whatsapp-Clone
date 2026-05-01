@@ -3,7 +3,7 @@ import { useAuth }   from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
 import Sidebar       from '../components/Sidebar/Sidebar'
 import ChatWindow    from '../components/ChatWindow/ChatWindow'
-import { getMessages, sendMessage, searchUsers, getConversations, editMessage } from '../api'
+import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage } from '../api'
 import e2ee from '../lib/e2ee'
 
 /* ── Debounce hook ─────────────────────────────────────────── */
@@ -45,6 +45,8 @@ export default function Chat() {
   const [loadingMsgs,      setLoadingMsgs]   = useState(false)
   const [typingUsers,      setTypingUsers]   = useState(new Set())
   const [highlightedIndex, setHighlighted]   = useState(-1)
+  const [forwardingMessage, setForwardingMessage] = useState(null)
+  const [forwardUsers, setForwardUsers] = useState([])
 
   /* ─────────────────────────────────────────────────────────
      Load conversations on mount → populates sidebar from DB
@@ -254,6 +256,65 @@ export default function Chat() {
       }
     }))
   }, [selectedUser, user])
+
+  const handleMessageUpdate = useCallback((messageId, updater) => {
+    setMessages((prev) => prev.map((msg) => (msg._id === messageId ? updater(msg) : msg)))
+    setRecentChats((prev) => prev.map((conv) => {
+      if (conv.lastMessage?._id !== messageId) return conv
+      return { ...conv, lastMessage: updater(conv.lastMessage) }
+    }))
+  }, [])
+
+  const handleMessageRemove = useCallback((messageId) => {
+    setMessages((prev) => prev.filter((msg) => msg._id !== messageId))
+    setRecentChats((prev) => prev.map((conv) => {
+      if (conv.lastMessage?._id !== messageId) return conv
+      return { ...conv, lastMessage: null }
+    }))
+  }, [])
+
+  const beginForward = useCallback(async (message) => {
+    if (!message) return
+    setForwardingMessage(message)
+    try {
+      const { data } = await getUsers()
+      setForwardUsers(data.users || [])
+    } catch (err) {
+      console.error('Failed to load forward recipients:', err)
+      setForwardUsers([])
+    }
+  }, [])
+
+  const cancelForward = useCallback(() => {
+    setForwardingMessage(null)
+  }, [])
+
+  const handleForwardRecipientSelect = useCallback(async (recipient, message) => {
+    if (!recipient || !message) return
+
+    const payload = await e2ee.encryptForChat(user._id, recipient._id, message.content)
+    await forwardMessage(message._id, { to: recipient._id, ...payload })
+
+    const previewContent = getPreviewText(message.messageType, message.content)
+    setRecentChats((prev) => {
+      const entry = prev.find((conv) => conv.user._id === recipient._id)
+      const newLast = {
+        _id: message._id,
+        content: previewContent,
+        createdAt: new Date().toISOString(),
+        sender: user._id,
+        messageType: message.messageType,
+        attachmentMeta: message.attachmentMeta || null,
+        sentAt: new Date().toISOString(),
+      }
+      if (entry) {
+        return [{ ...entry, lastMessage: newLast }, ...prev.filter((conv) => conv.user._id !== recipient._id)]
+      }
+      return [{ user: recipient, lastMessage: newLast, unreadCount: 0 }, ...prev]
+    })
+
+    setForwardingMessage(null)
+  }, [user, getPreviewText])
 
   /* ─────────────────────────────────────────────────────────
      Socket events — incoming messages, typing indicators
@@ -504,6 +565,13 @@ export default function Chat() {
         isOnline={isOnline}
         isTyping={selectedUser ? typingUsers.has(selectedUser._id) : false}
         onBack={() => setSelected(null)}
+        forwardingMessage={forwardingMessage}
+        forwardUsers={forwardUsers}
+        onForwardRecipientSelect={handleForwardRecipientSelect}
+        onCancelForward={cancelForward}
+        onForwardRequest={beginForward}
+        onMessageUpdate={handleMessageUpdate}
+        onMessageRemove={handleMessageRemove}
       />
     </div>
   )

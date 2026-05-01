@@ -9,8 +9,9 @@ import TypingIndicator from './TypingIndicator'
 import SpotlightCard from '../bits/SpotlightCard'
 import GradientText from '../bits/GradientText'
 import ShinyText from '../bits/ShinyText'
+import ForwardDialog from '../ForwardDialog'
 
-export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack }) {
+export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove }) {
   const [showScheduled, setShowScheduled] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)
   const emptyRef = useRef(null)
@@ -125,15 +126,32 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
         currentUser={currentUser} 
         loading={loading} 
         onEditRequest={(message) => setEditingMessage(message)}
+        onForwardRequest={onForwardRequest}
+        onMessageUpdate={onMessageUpdate}
+        onMessageRemove={onMessageRemove}
       />
       {isTyping && <TypingIndicator />}
-      <MessageInput
-        onSend={onSend}
-        selectedUser={selectedUser}
-        editingMessage={editingMessage}
-        onSubmitEdit={onEditMessage}
-        onCancelEdit={() => setEditingMessage(null)}
-      />
+      {forwardingMessage ? (
+        <div className="forward-inline-shell">
+          <ForwardDialog
+            open={Boolean(forwardingMessage)}
+            inline
+            message={forwardingMessage}
+            onClose={onCancelForward}
+            onForward={onForwardRecipientSelect}
+            currentUser={currentUser}
+            allUsers={forwardUsers}
+          />
+        </div>
+      ) : (
+        <MessageInput
+          onSend={onSend}
+          selectedUser={selectedUser}
+          editingMessage={editingMessage}
+          onSubmitEdit={onEditMessage}
+          onCancelEdit={() => setEditingMessage(null)}
+        />
+      )}
       <ScheduledList
         open={showScheduled}
         onClose={() => setShowScheduled(false)}
