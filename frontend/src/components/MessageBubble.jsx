@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
-import { Play, Pause, Clock, Edit } from 'lucide-react'
+import { Play, Pause, Clock, Edit, Maximize2, Download, Save } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function MessageBubble({ message, isMine, onEditRequest }) {
+export default function MessageBubble({ message, isMine, onEditRequest, onOpenMedia }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const audioRef = useRef(null)
@@ -44,6 +44,58 @@ export default function MessageBubble({ message, isMine, onEditRequest }) {
   const handleEnded = () => {
     setIsPlaying(false)
     setPlaybackTime(0)
+  }
+
+  const getExtensionFromMime = (mime) => {
+    const map = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/gif': 'gif',
+      'video/mp4': 'mp4',
+      'video/webm': 'webm',
+      'application/pdf': 'pdf',
+    }
+    return map[mime] || 'bin'
+  }
+
+  const getAttachmentName = (fallbackBase = 'attachment') => {
+    const metaName = message.attachmentMeta?.name
+    if (metaName) return metaName
+    const mime = message.attachmentMeta?.mime || ''
+    const ext = getExtensionFromMime(mime)
+    return `${fallbackBase}.${ext}`
+  }
+
+  const handleDownload = (url, fileName) => {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.rel = 'noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleSave = async (url, fileName) => {
+    if (!window.showSaveFilePicker) {
+      handleDownload(url, fileName)
+      return
+    }
+
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const fileHandle = await window.showSaveFilePicker({ suggestedName: fileName })
+      const writable = await fileHandle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('Save failed, falling back to download:', error)
+        handleDownload(url, fileName)
+      }
+    }
   }
 
   const isEditableMessage = () => {
@@ -119,17 +171,45 @@ export default function MessageBubble({ message, isMine, onEditRequest }) {
     }
 
     if (message.messageType === 'photo' || message.messageType === 'camera') {
+      const fileName = getAttachmentName('photo')
       return (
         <div className="attachment-message attachment-message--photo">
-          <img src={message.content} alt="Shared attachment" className="attachment-photo" loading="lazy" />
+          <div className="attachment-media-wrap">
+            <img src={message.content} alt="Shared attachment" className="attachment-photo" loading="lazy" />
+            <div className="attachment-actions">
+              <button className="attachment-action-btn" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
+                <Maximize2 size={14} />
+              </button>
+              <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, fileName)}>
+                <Download size={14} />
+              </button>
+              <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, fileName)}>
+                <Save size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       )
     }
 
     if (message.messageType === 'video') {
+      const fileName = getAttachmentName('video')
       return (
         <div className="attachment-message attachment-message--video">
-          <video src={message.content} controls className="attachment-video" preload="metadata" />
+          <div className="attachment-media-wrap">
+            <video src={message.content} controls className="attachment-video" preload="metadata" />
+            <div className="attachment-actions">
+              <button className="attachment-action-btn" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
+                <Maximize2 size={14} />
+              </button>
+              <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, fileName)}>
+                <Download size={14} />
+              </button>
+              <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, fileName)}>
+                <Save size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       )
     }
@@ -137,16 +217,18 @@ export default function MessageBubble({ message, isMine, onEditRequest }) {
     if (message.messageType === 'document') {
       const name = message.attachmentMeta?.name || 'document'
       return (
-        <a
-          className="attachment-message attachment-message--document"
-          href={message.content}
-          download={name}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <div className="attachment-message attachment-message--document">
           <span className="attachment-doc-icon">📄</span>
           <span className="attachment-doc-name">{name}</span>
-        </a>
+          <div className="attachment-inline-actions">
+            <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, name)}>
+              <Download size={14} />
+            </button>
+            <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, name)}>
+              <Save size={14} />
+            </button>
+          </div>
+        </div>
       )
     }
 
