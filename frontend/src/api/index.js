@@ -30,6 +30,7 @@ export const getConversations = ()               => API.get('/messages/conversat
 export const getMessages      = (userId)         => API.get(`/messages/${userId}`)
 export const sendMessage      = (userId, payload) => API.post(`/messages/${userId}`, payload)
 export const getUnread        = ()               => API.get('/messages/unread')
+export const getStarredMessages = ()             => API.get('/messages/starred')
 export const getScheduledMessages = (userId)    => API.get(`/messages/${userId}/scheduled`)
 export const cancelScheduledMessage = (messageId) => API.delete(`/messages/scheduled/${messageId}`)
 export const editMessage = (messageId, payload) => API.put(`/messages/${messageId}/edit`, payload)

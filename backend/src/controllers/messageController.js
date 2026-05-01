@@ -210,6 +210,29 @@ const getScheduledMessages = async (req, res, next) => {
   }
 }
 
+// ── GET /api/messages/starred ───────────────────────────────
+const getStarredMessages = async (req, res, next) => {
+  try {
+    const myId = req.user._id
+
+    const messages = await Message.find({
+      $or: [
+        { sender: myId },
+        { receiver: myId },
+      ],
+      starredBy: myId,
+      deletedFor: { $ne: myId },
+    })
+      .populate('sender', 'username avatarColor avatar')
+      .populate('receiver', 'username avatarColor avatar')
+      .sort({ createdAt: -1 })
+
+    res.status(200).json({ success: true, count: messages.length, messages })
+  } catch (error) {
+    next(error)
+  }
+}
+
 // ── DELETE /api/messages/scheduled/:messageId ────────────
 const cancelScheduledMessage = async (req, res, next) => {
   try {
@@ -254,7 +277,7 @@ const cancelScheduledMessage = async (req, res, next) => {
   }
 }
 
-module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage }
+module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, getStarredMessages, cancelScheduledMessage }
 
 // ── PUT /api/messages/:messageId/edit ─────────────────────
 const editMessage = async (req, res, next) => {
@@ -549,6 +572,7 @@ module.exports = {
   sendMessage,
   getUnreadCounts,
   getScheduledMessages,
+  getStarredMessages,
   cancelScheduledMessage,
   editMessage,
   forwardMessage,

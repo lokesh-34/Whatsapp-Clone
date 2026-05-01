@@ -3,6 +3,8 @@ import { useAuth }   from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
 import Sidebar       from '../components/Sidebar/Sidebar'
 import ChatWindow    from '../components/ChatWindow/ChatWindow'
+import ScheduledList from '../components/ChatWindow/ScheduledList'
+import StarredMessages from '../components/ChatWindow/StarredMessages'
 import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage } from '../api'
 import e2ee from '../lib/e2ee'
 
@@ -47,6 +49,8 @@ export default function Chat() {
   const [highlightedIndex, setHighlighted]   = useState(-1)
   const [forwardingMessage, setForwardingMessage] = useState(null)
   const [forwardUsers, setForwardUsers] = useState([])
+  const [scheduledOpen, setScheduledOpen] = useState(false)
+  const [starredOpen, setStarredOpen] = useState(false)
 
   /* ─────────────────────────────────────────────────────────
      Load conversations on mount → populates sidebar from DB
@@ -287,6 +291,15 @@ export default function Chat() {
 
   const cancelForward = useCallback(() => {
     setForwardingMessage(null)
+  }, [])
+
+  const openScheduledMessages = useCallback(() => {
+    if (!selectedUser) return
+    setScheduledOpen(true)
+  }, [selectedUser])
+
+  const openStarredMessages = useCallback(() => {
+    setStarredOpen(true)
   }, [])
 
   const handleForwardRecipientSelect = useCallback(async (recipient, message) => {
@@ -548,6 +561,8 @@ export default function Chat() {
         selectedUser={selectedUser}
         onSelectUser={handleSelectUser}
         onLogout={logout}
+        onOpenStarred={openStarredMessages}
+        onOpenScheduled={openScheduledMessages}
         isOnline={isOnline}
         searchQuery={searchQuery}
         onSearch={setSearch}
@@ -572,6 +587,21 @@ export default function Chat() {
         onForwardRequest={beginForward}
         onMessageUpdate={handleMessageUpdate}
         onMessageRemove={handleMessageRemove}
+        scheduledOpen={scheduledOpen}
+        onOpenScheduled={openScheduledMessages}
+        onCloseScheduled={() => setScheduledOpen(false)}
+      />
+      <StarredMessages
+        open={starredOpen}
+        onClose={() => setStarredOpen(false)}
+        currentUser={user}
+        onOpenChat={handleSelectUser}
+      />
+      <ScheduledList
+        open={scheduledOpen && Boolean(selectedUser)}
+        onClose={() => setScheduledOpen(false)}
+        userId={selectedUser?._id}
+        onCancelled={() => setScheduledOpen(false)}
       />
     </div>
   )

@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
+import { Menu, Clock3, Star, LogOut } from 'lucide-react'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import ShinyText    from '../bits/ShinyText'
 import GradientText from '../bits/GradientText'
@@ -170,9 +171,21 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
 // ── Main Sidebar ─────────────────────────────────────────────
 export default function Sidebar({
   currentUser, conversations, selectedUser, onSelectUser,
-  onLogout, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
+  onLogout, onOpenStarred, onOpenScheduled, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
   const showEmpty = conversations.length === 0
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const closeMenu = (event) => {
+      if (menuRef.current?.contains(event.target)) return
+      setMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', closeMenu)
+    return () => document.removeEventListener('mousedown', closeMenu)
+  }, [])
 
   return (
     <aside className="sidebar">
@@ -191,14 +204,40 @@ export default function Sidebar({
             <ShinyText text={currentUser?.username || ''} color="#E9EDEF" shineColor="#fff" speed={6} />
           </span>
         </div>
-        <motion.button id="logout-btn" className="icon-btn" onClick={onLogout} title="Logout"
-          whileHover={{ scale: 1.15, rotate: 12 }} whileTap={{ scale: 0.88 }}>
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-        </motion.button>
+        <div className="sidebar-header-actions" ref={menuRef}>
+          <motion.button
+            type="button"
+            className="icon-btn"
+            onClick={() => setMenuOpen((value) => !value)}
+            title="Menu"
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Menu size={20} />
+          </motion.button>
+
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                className="sidebar-menu-panel"
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+              >
+                <button type="button" className="sidebar-menu-item" onClick={() => { setMenuOpen(false); onOpenStarred?.() }}>
+                  <Star size={16} /> Starred messages
+                </button>
+                <button type="button" className="sidebar-menu-item" onClick={() => { setMenuOpen(false); onOpenScheduled?.() }} disabled={!selectedUser} title={!selectedUser ? 'Open a chat first' : 'Scheduled messages'}>
+                  <Clock3 size={16} /> Scheduled messages
+                </button>
+                <button type="button" className="sidebar-menu-item sidebar-menu-item--danger" onClick={() => { setMenuOpen(false); onLogout?.() }}>
+                  <LogOut size={16} /> Logout
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Search bar */}

@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react'
 import gsap from 'gsap'
 import { motion } from 'framer-motion'
 import { Avatar, AvatarFallback } from '../ui/avatar'
-import ScheduledList from './ScheduledList'
 import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import TypingIndicator from './TypingIndicator'
@@ -11,8 +10,7 @@ import GradientText from '../bits/GradientText'
 import ShinyText from '../bits/ShinyText'
 import ForwardDialog from '../ForwardDialog'
 
-export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove }) {
-  const [showScheduled, setShowScheduled] = useState(false)
+export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove, onOpenScheduled }) {
   const [editingMessage, setEditingMessage] = useState(null)
   const emptyRef = useRef(null)
 
@@ -116,7 +114,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
           </motion.span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="icon-btn" title="Scheduled" onClick={() => setShowScheduled(true)}>⏰</button>
+          <button className="icon-btn" title="Scheduled messages" onClick={onOpenScheduled}>⏰</button>
         </div>
       </motion.div>
 
@@ -152,18 +150,6 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
           onCancelEdit={() => setEditingMessage(null)}
         />
       )}
-      <ScheduledList
-        open={showScheduled}
-        onClose={() => setShowScheduled(false)}
-        userId={selectedUser?._id}
-        onCancelled={(id) => {
-          // Remove cancelled message from messages and update UI
-          // Chat page will receive socket events as well; optimistic update here
-          // emit a messageStatusUpdated will come from server, but ensure UI updates now
-          // Not mutating props; rely on parent to re-fetch if needed
-          setShowScheduled(false)
-        }}
-      />
     </main>
   )
 }
