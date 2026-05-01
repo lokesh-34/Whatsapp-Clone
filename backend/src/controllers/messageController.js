@@ -245,3 +245,70 @@ const cancelScheduledMessage = async (req, res, next) => {
 
 module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage }
 
+// ── PUT /api/messages/:messageId/edit ─────────────────────
+const editMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params
+    const { encryptedMessage, iv, encryptedKey } = req.body
+    const myId = req.user._id
+    const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000 // 15 minutes
+
+    const message = await Message.findById(messageId)
+    if (!message) return res.status(404).json({ success: false, message: 'Message not found.' })
+
+    if (message.sender.toString() !== myId.toString())
+      return res.status(403).json({ success: false, message: 'Only the sender can edit this message.' })
+
+    // Check if message is a text message (voice/emoji cannot be edited)
+    if (message.messageType !== 'text')
+      return res.status(400).json({ success: false, message: 'Only text messages can be edited.' })
+
+    // Check if within 15 minutes
+    const messageTime = message.sentAt || message.createdAt
+    const timeDiff = Date.now() - messageTime.getTime()
+    if (timeDiff > EDIT_TIME_LIMIT_MS)
+      return res.status(400).json({ success: false, message: 'Message can only be edited within 15 minutes of sending.' })
+
+    if (!encryptedMessage)
+      return res.status(400).json({ success: false, message: 'Encrypted message is required.' })
+
+    // Update the message with new encrypted content and edit timestamp
+    message.encryptedMessage = encryptedMessage
+    message.iv = iv
+    message.encryptedKey = encryptedKey || message.encryptedKey
+    message.editedAt = new Date()
+    await message.save()
+
+    await message.populate('sender',   'username avatarColor avatar')
+    await message.populate('receiver', 'username avatarColor avatar')
+
+    const messageObj = message.toObject()
+
+    // Emit socket event for the edit to both sender and receiver
+    try {
+      const io = getIO()
+      if (io) {
+        const payload = {
+          messageId: message._id,
+          senderId: message.sender._id || message.sender,
+          receiverId: message.receiver._id || message.receiver,
+          encryptedMessage: message.encryptedMessage,
+          iv: message.iv,
+          encryptedKey: message.encryptedKey,
+          editedAt: message.editedAt,
+        }
+        io.to(message.sender._id?.toString() || message.sender.toString()).emit('messageEdited', payload)
+        io.to(message.receiver._id?.toString() || message.receiver.toString()).emit('messageEdited', payload)
+      }
+    } catch (emitErr) {
+      console.error('Failed to emit edit event:', emitErr.message)
+    }
+
+    res.status(200).json({ success: true, message: messageObj })
+  } catch (error) {
+    next(error)
+  }
+}
+
+module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage, editMessage }
+

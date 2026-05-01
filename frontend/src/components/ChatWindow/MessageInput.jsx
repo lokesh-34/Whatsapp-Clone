@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSocket } from '../../context/SocketContext'
-import { Send, Smile, Mic, Square, Clock } from 'lucide-react'
+import { Send, Smile, Mic, Square, Clock, Check, X } from 'lucide-react'
 import { voiceRecorder } from '../../lib/voiceRecorder'
 
 const getDefaultScheduleValue = () => {
@@ -11,7 +11,7 @@ const getDefaultScheduleValue = () => {
   return local.toISOString().slice(0, 16)
 }
 
-export default function MessageInput({ onSend, selectedUser }) {
+export default function MessageInput({ onSend, selectedUser, editingMessage, onSubmitEdit, onCancelEdit }) {
   const [text, setText]            = useState('')
   const [typing, setTyping]        = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -19,6 +19,7 @@ export default function MessageInput({ onSend, selectedUser }) {
   const [scheduledFor, setScheduledFor]       = useState(getDefaultScheduleValue())
   const [isRecording, setIsRecording]         = useState(false)
   const [recordingTime, setRecordingTime]     = useState(0)
+  const [isSavingEdit, setIsSavingEdit]       = useState(false)
   const { socket }                 = useSocket()
   const typingTimer                = useRef(null)
   const inputRef                   = useRef(null)
@@ -29,6 +30,15 @@ export default function MessageInput({ onSend, selectedUser }) {
   const commonEmojis = ['😀', '😂', '😍', '😢', '😡', '👍', '👎', '❤️', '🔥', '✨', '💯', '😎', '🤔', '😴', '🤮', '🎉', '😘', '💪', '🙏', '👏', '🎊', '🎈', '🌟', '💝']
 
   useEffect(() => { inputRef.current?.focus() }, [selectedUser])
+
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.content || '')
+      setShowEmojiPicker(false)
+      setShowSchedulePicker(false)
+      inputRef.current?.focus()
+    }
+  }, [editingMessage])
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -123,7 +133,33 @@ export default function MessageInput({ onSend, selectedUser }) {
   }
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(text) }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (editingMessage) {
+        handleEditSave()
+        return
+      }
+      handleSend(text)
+    }
+  }
+
+  const handleEditSave = async () => {
+    if (!editingMessage || !text.trim()) return
+    if (text === editingMessage.content) {
+      onCancelEdit && onCancelEdit()
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      await onSubmitEdit?.(editingMessage._id, text)
+      setText('')
+      onCancelEdit && onCancelEdit()
+    } catch (err) {
+      console.error('Edit message failed:', err)
+    } finally {
+      setIsSavingEdit(false)
+    }
   }
 
   const addEmoji = (emoji) => {
@@ -179,6 +215,18 @@ export default function MessageInput({ onSend, selectedUser }) {
         </div>
       ) : (
         <>
+          {editingMessage && (
+            <div className="editing-banner">
+              <div className="editing-banner-text">
+                <span className="editing-banner-title">Editing message</span>
+                <span className="editing-banner-preview">{editingMessage.content}</span>
+              </div>
+              <button className="editing-banner-cancel" onClick={() => { onCancelEdit && onCancelEdit(); setText('') }} title="Cancel edit">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           <div className="input-actions">
             <motion.button
               className="action-btn emoji-btn"
@@ -234,66 +282,93 @@ export default function MessageInput({ onSend, selectedUser }) {
 
           <textarea
             ref={inputRef} id="message-input" className="message-textarea"
-            placeholder="Type a message" value={text}
+            placeholder={editingMessage ? 'Edit your message' : 'Type a message'} value={text}
             onChange={handleChange} onKeyDown={handleKeyDown} rows={1}
           />
 
           <div className="input-actions">
-            {hasText ? (
+            {hasText || editingMessage ? (
               <>
-                <div className="schedule-wrap">
+                {!editingMessage && (
+                  <div className="schedule-wrap">
+                    <motion.button
+                      className="action-btn schedule-btn"
+                      onClick={() => {
+                        setScheduledFor(getDefaultScheduleValue())
+                        setShowSchedulePicker(prev => !prev)
+                      }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      title="Schedule message"
+                    >
+                      <Clock size={18} />
+                    </motion.button>
+
+                    <AnimatePresence>
+                      {showSchedulePicker && (
+                        <motion.div
+                          className="schedule-popover"
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <label className="schedule-label" htmlFor="schedule-time">Send later</label>
+                          <input
+                            id="schedule-time"
+                            type="datetime-local"
+                            className="schedule-input"
+                            value={scheduledFor}
+                            onChange={(e) => setScheduledFor(e.target.value)}
+                          />
+                          <div className="schedule-actions">
+                            <button className="schedule-cancel" onClick={() => setShowSchedulePicker(false)} type="button">
+                              Cancel
+                            </button>
+                            <button className="schedule-confirm" onClick={handleScheduleSend} type="button">
+                              Schedule
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {editingMessage ? (
+                  <>
+                    <motion.button
+                      className="action-btn edit-cancel-btn"
+                      onClick={() => { onCancelEdit && onCancelEdit(); setText('') }}
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.9 }}
+                      title="Cancel edit"
+                    >
+                      <X size={18} />
+                    </motion.button>
+                    <motion.button
+                      id="send-btn"
+                      className="action-btn send-btn send-btn--active"
+                      onClick={handleEditSave}
+                      whileHover={{ scale: 1.12 }}
+                      whileTap={{ scale: 0.88 }}
+                      disabled={isSavingEdit || !text.trim()}
+                      title="Save edit"
+                    >
+                      <Check size={18} />
+                    </motion.button>
+                  </>
+                ) : (
                   <motion.button
-                    className="action-btn schedule-btn"
-                    onClick={() => {
-                      setScheduledFor(getDefaultScheduleValue())
-                      setShowSchedulePicker(prev => !prev)
-                    }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    title="Schedule message"
+                    id="send-btn"
+                    className="action-btn send-btn send-btn--active"
+                    onClick={() => handleSend(text)}
+                    whileHover={{ scale: 1.12 }}
+                    whileTap={{ scale: 0.88, rotate: 15 }}
                   >
-                    <Clock size={18} />
+                    <Send size={18} />
                   </motion.button>
-
-                  <AnimatePresence>
-                    {showSchedulePicker && (
-                      <motion.div
-                        className="schedule-popover"
-                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <label className="schedule-label" htmlFor="schedule-time">Send later</label>
-                        <input
-                          id="schedule-time"
-                          type="datetime-local"
-                          className="schedule-input"
-                          value={scheduledFor}
-                          onChange={(e) => setScheduledFor(e.target.value)}
-                        />
-                        <div className="schedule-actions">
-                          <button className="schedule-cancel" onClick={() => setShowSchedulePicker(false)} type="button">
-                            Cancel
-                          </button>
-                          <button className="schedule-confirm" onClick={handleScheduleSend} type="button">
-                            Schedule
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <motion.button
-                  id="send-btn"
-                  className="action-btn send-btn send-btn--active"
-                  onClick={() => handleSend(text)}
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.88, rotate: 15 }}
-                >
-                  <Send size={18} />
-                </motion.button>
+                )}
               </>
             ) : (
               <motion.button

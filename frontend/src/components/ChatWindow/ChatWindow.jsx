@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import gsap from 'gsap'
 import { motion } from 'framer-motion'
 import { Avatar, AvatarFallback } from '../ui/avatar'
+import ScheduledList from './ScheduledList'
 import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import TypingIndicator from './TypingIndicator'
@@ -9,7 +10,9 @@ import SpotlightCard from '../bits/SpotlightCard'
 import GradientText from '../bits/GradientText'
 import ShinyText from '../bits/ShinyText'
 
-export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, isOnline, isTyping, onBack }) {
+export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack }) {
+  const [showScheduled, setShowScheduled] = useState(false)
+  const [editingMessage, setEditingMessage] = useState(null)
   const emptyRef = useRef(null)
 
   useEffect(() => {
@@ -27,6 +30,10 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
       return () => ctx.revert()
     }
   }, [selectedUser])
+
+  useEffect(() => {
+    setEditingMessage(null)
+  }, [selectedUser?._id])
 
   if (!selectedUser) {
     return (
@@ -107,11 +114,38 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
             }
           </motion.span>
         </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="icon-btn" title="Scheduled" onClick={() => setShowScheduled(true)}>⏰</button>
+        </div>
       </motion.div>
 
-      <MessageList messages={messages} currentUser={currentUser} loading={loading} />
       {isTyping && <TypingIndicator />}
-      <MessageInput onSend={onSend} selectedUser={selectedUser} />
+      <MessageList 
+        messages={messages} 
+        currentUser={currentUser} 
+        loading={loading} 
+        onEditRequest={(message) => setEditingMessage(message)}
+      />
+      {isTyping && <TypingIndicator />}
+      <MessageInput
+        onSend={onSend}
+        selectedUser={selectedUser}
+        editingMessage={editingMessage}
+        onSubmitEdit={onEditMessage}
+        onCancelEdit={() => setEditingMessage(null)}
+      />
+      <ScheduledList
+        open={showScheduled}
+        onClose={() => setShowScheduled(false)}
+        userId={selectedUser?._id}
+        onCancelled={(id) => {
+          // Remove cancelled message from messages and update UI
+          // Chat page will receive socket events as well; optimistic update here
+          // emit a messageStatusUpdated will come from server, but ensure UI updates now
+          // Not mutating props; rely on parent to re-fetch if needed
+          setShowScheduled(false)
+        }}
+      />
     </main>
   )
 }

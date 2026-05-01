@@ -1,6 +1,6 @@
 const express = require('express')
 const { body } = require('express-validator')
-const { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage } = require('../controllers/messageController')
+const { getConversations, getMessages, sendMessage, getUnreadCounts, getScheduledMessages, cancelScheduledMessage, editMessage } = require('../controllers/messageController')
 const { protect } = require('../middlewares/auth')
 
 const router = express.Router()
@@ -17,6 +17,9 @@ router.get('/:userId/scheduled', getScheduledMessages)
 
 // DELETE /api/messages/scheduled/:messageId  (cancel a scheduled message)
 router.delete('/scheduled/:messageId', cancelScheduledMessage)
+
+// PUT /api/messages/:messageId/edit  (edit a text message within 15 minutes)
+router.put('/:messageId/edit', editMessage)
 
 // GET /api/messages/:userId
 router.get('/:userId', getMessages)

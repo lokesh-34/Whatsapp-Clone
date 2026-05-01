@@ -3,7 +3,7 @@ import { useAuth }   from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
 import Sidebar       from '../components/Sidebar/Sidebar'
 import ChatWindow    from '../components/ChatWindow/ChatWindow'
-import { getMessages, sendMessage, searchUsers, getConversations } from '../api'
+import { getMessages, sendMessage, searchUsers, getConversations, editMessage } from '../api'
 import e2ee from '../lib/e2ee'
 
 /* ── Debounce hook ─────────────────────────────────────────── */
@@ -207,6 +207,42 @@ export default function Chat() {
     }
   }, [socket, selectedUser, user])
 
+  const handleEditMessage = useCallback(async (messageId, content) => {
+    if (!selectedUser || !messageId || !content?.trim()) return
+
+    const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
+    const { data } = await editMessage(messageId, payload)
+
+    const editedAt = data?.message?.editedAt || new Date().toISOString()
+
+    setMessages(prev => prev.map((msg) => {
+      if (msg._id !== messageId) return msg
+      return {
+        ...msg,
+        encryptedMessage: payload.encryptedMessage,
+        iv: payload.iv,
+        encryptedKey: payload.encryptedKey,
+        content,
+        editedAt,
+      }
+    }))
+
+    setRecentChats(prev => prev.map((conv) => {
+      if (conv.lastMessage?._id !== messageId) return conv
+      return {
+        ...conv,
+        lastMessage: {
+          ...conv.lastMessage,
+          encryptedMessage: payload.encryptedMessage,
+          iv: payload.iv,
+          encryptedKey: payload.encryptedKey,
+          content,
+          editedAt,
+        },
+      }
+    }))
+  }, [selectedUser, user])
+
   /* ─────────────────────────────────────────────────────────
      Socket events — incoming messages, typing indicators
   ───────────────────────────────────────────────────────── */
@@ -305,16 +341,60 @@ export default function Chat() {
     const handleStopTyping = ({ from }) =>
       setTypingUsers(prev => { const n = new Set(prev); n.delete(from); return n })
 
+    const handleMessageEdited = async ({ messageId, encryptedMessage, iv, encryptedKey, editedAt }) => {
+      if (!messageId) return
+
+      // Decrypt the edited content
+      let editedContent = '[edited message]'
+      try {
+        const decrypted = await e2ee.decryptMessageObject(user._id, { encryptedMessage, iv, encryptedKey }, selectedUser._id)
+        editedContent = decrypted
+      } catch (err) {
+        console.warn('Failed to decrypt edited message:', err)
+      }
+
+      // Update messages list
+      setMessages(prev => prev.map(msg => {
+        if (msg._id !== messageId) return msg
+        return {
+          ...msg,
+          encryptedMessage,
+          iv,
+          encryptedKey,
+          content: editedContent,
+          editedAt,
+        }
+      }))
+
+      // Update recent chats if it's the last message
+      setRecentChats(prev => prev.map(conv => {
+        if (conv.lastMessage?._id !== messageId) return conv
+        return {
+          ...conv,
+          lastMessage: {
+            ...conv.lastMessage,
+            encryptedMessage,
+            iv,
+            encryptedKey,
+            content: editedContent,
+            editedAt,
+          },
+        }
+      }))
+    }
+
     socket.on('newMessage',        handleNewMessage)
     socket.on('userTyping',        handleTyping)
     socket.on('userStoppedTyping', handleStopTyping)
     socket.on('messageStatusUpdated', handleMessageStatusUpdated)
+    socket.on('messageEdited', handleMessageEdited)
 
     return () => {
       socket.off('newMessage',        handleNewMessage)
       socket.off('userTyping',        handleTyping)
       socket.off('userStoppedTyping', handleStopTyping)
       socket.off('messageStatusUpdated', handleMessageStatusUpdated)
+      socket.off('messageEdited', handleMessageEdited)
     }
   }, [socket, selectedUser, user])
 
@@ -376,6 +456,7 @@ export default function Chat() {
         messages={messages}
         loading={loadingMsgs}
         onSend={handleSend}
+        onEditMessage={handleEditMessage}
         isOnline={isOnline}
         isTyping={selectedUser ? typingUsers.has(selectedUser._id) : false}
         onBack={() => setSelected(null)}

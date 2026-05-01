@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import MessageBubble from '../MessageBubble'
 
-export default function MessageList({ messages, currentUser, loading }) {
+export default function MessageList({ messages, currentUser, loading, onEditRequest }) {
   const bottomRef = useRef(null)
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
 
@@ -31,6 +31,7 @@ export default function MessageList({ messages, currentUser, loading }) {
               key={msg._id}
               message={msg}
               isMine={(msg.sender?._id || msg.sender)?.toString?.() === currentUserId}
+              onEditRequest={onEditRequest}
             />
           ))}
         </AnimatePresence>

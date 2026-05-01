@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
-import { Play, Pause, Clock } from 'lucide-react'
+import { Play, Pause, Clock, Edit } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function MessageBubble({ message, isMine }) {
+export default function MessageBubble({ message, isMine, onEditRequest }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const audioRef = useRef(null)
@@ -44,6 +44,15 @@ export default function MessageBubble({ message, isMine }) {
   const handleEnded = () => {
     setIsPlaying(false)
     setPlaybackTime(0)
+  }
+
+  const isEditableMessage = () => {
+    if (!isMine || message.messageType !== 'text') return false
+    if (message.scheduledStatus === 'scheduled') return false
+    const messageTime = message.sentAt || message.createdAt
+    const timeDiff = Date.now() - new Date(messageTime).getTime()
+    const fifteenMinutes = 15 * 60 * 1000
+    return timeDiff < fifteenMinutes
   }
 
   // Determine message type and render accordingly
@@ -113,41 +122,55 @@ export default function MessageBubble({ message, isMine }) {
     return <span className="bubble-text">{message.content}</span>
   }
 
+  const showEdited = message.editedAt && !isScheduled
+
   return (
-    <motion.div
-      className={`bubble-row ${isMine ? 'bubble-row--mine' : 'bubble-row--theirs'}`}
-      initial={{ opacity: 0, x: isMine ? 24 : -24, scale: 0.92 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      layout
-    >
-      <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`}>
-        {renderContent()}
-        <span className="bubble-meta">
-          <span className="bubble-time">{time}</span>
-          {isMine && (
-            <span className="bubble-tick" title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
-              {isScheduled ? (
-                <Clock size={14} strokeWidth={2.2} />
-              ) : isRead ? (
-                <svg width="16" height="11" viewBox="0 0 16 11" fill="#53bdeb">
-                  <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
-                  <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
-                </svg>
-              ) : isDelivered ? (
-                <svg width="16" height="11" viewBox="0 0 16 11" fill="#8696A0">
-                  <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
-                  <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
-                </svg>
-              ) : (
-                <svg width="12" height="11" viewBox="0 0 12 11" fill="#8696A0">
-                  <path d="M10.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
-                </svg>
-              )}
-            </span>
-          )}
-        </span>
-      </div>
-    </motion.div>
+    <>
+      <motion.div
+        className={`bubble-row ${isMine ? 'bubble-row--mine' : 'bubble-row--theirs'}`}
+        initial={{ opacity: 0, x: isMine ? 24 : -24, scale: 0.92 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+        layout
+      >
+        <div className={`bubble ${isMine ? 'bubble--sent' : 'bubble--received'}`}>
+          {renderContent()}
+          <span className="bubble-meta">
+            {isEditableMessage() && (
+              <button 
+                className="edit-msg-btn" 
+                onClick={() => onEditRequest && onEditRequest(message)}
+                title="Edit message"
+              >
+                <Edit size={12} />
+              </button>
+            )}
+            {showEdited && <span className="edited-label">edited</span>}
+            <span className="bubble-time">{time}</span>
+            {isMine && (
+              <span className="bubble-tick" title={isScheduled ? 'Scheduled' : isRead ? 'Read' : isDelivered ? 'Delivered' : 'Sent'}>
+                {isScheduled ? (
+                  <Clock size={14} strokeWidth={2.2} />
+                ) : isRead ? (
+                  <svg width="16" height="11" viewBox="0 0 16 11" fill="#53bdeb">
+                    <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                    <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
+                  </svg>
+                ) : isDelivered ? (
+                  <svg width="16" height="11" viewBox="0 0 16 11" fill="#8696A0">
+                    <path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                    <path d="M14.571.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-.392.207l1.392-1.39 4.44-6.377z"/>
+                  </svg>
+                ) : (
+                  <svg width="12" height="11" viewBox="0 0 12 11" fill="#8696A0">
+                    <path d="M10.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 5.97-5.97z"/>
+                  </svg>
+                )}
+              </span>
+            )}
+          </span>
+        </div>
+      </motion.div>
+    </>
   )
 }
