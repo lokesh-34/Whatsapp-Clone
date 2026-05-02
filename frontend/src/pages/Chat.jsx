@@ -6,7 +6,7 @@ import ChatWindow    from '../components/ChatWindow/ChatWindow'
 import ScheduledList from '../components/ChatWindow/ScheduledList'
 import StarredMessages from '../components/ChatWindow/StarredMessages'
 import GroupManager from '../components/GroupManager/GroupManager'
-import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage, getGroups, getGroupMessages, sendGroupMessage } from '../api'
+import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage, getGroups, getGroupMessages, sendGroupMessage, togglePinConversation, toggleStarConversation, markConversationRead } from '../api'
 import e2ee from '../lib/e2ee'
 
 /* ── Debounce hook ─────────────────────────────────────────── */
@@ -346,6 +346,35 @@ export default function Chat() {
       return { ...conv, lastMessage: null }
     }))
   }, [])
+
+  const updateConversationPreference = useCallback((userId, patch) => {
+    setRecentChats((prev) => prev.map((conv) => {
+      const convId = conv.user._id?.toString?.() || conv.user._id
+      if (convId !== userId.toString()) return conv
+      return { ...conv, ...patch }
+    }))
+  }, [])
+
+  const handleConversationPreferenceChange = useCallback(async ({ userId, type }) => {
+    if (!userId || !type) return
+
+    if (type === 'star') {
+      const { data } = await toggleStarConversation(userId)
+      updateConversationPreference(userId, { starred: Boolean(data?.starred) })
+      return
+    }
+
+    if (type === 'pin') {
+      const { data } = await togglePinConversation(userId)
+      updateConversationPreference(userId, { pinned: Boolean(data?.pinned) })
+      return
+    }
+
+    if (type === 'read') {
+      await markConversationRead(userId)
+      updateConversationPreference(userId, { unreadCount: 0 })
+    }
+  }, [updateConversationPreference])
 
   const beginForward = useCallback(async (message) => {
     if (selectedUser?.isGroup) return
@@ -692,6 +721,7 @@ export default function Chat() {
         conversations={displayList}
         selectedUser={selectedUser}
         onSelectUser={handleSelectUser}
+        onConversationPreferenceChange={handleConversationPreferenceChange}
         onLogout={logout}
         onOpenStarred={openStarredMessages}
         onOpenScheduled={openScheduledMessages}

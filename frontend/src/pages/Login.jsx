@@ -4,11 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
 import { loginUser } from '../api'
 import { useAuth } from '../context/AuthContext'
-import Aurora          from '../components/bits/Aurora'
-import SpotlightCard   from '../components/bits/SpotlightCard'
-import StarBorder      from '../components/bits/StarBorder'
-import ShinyText       from '../components/bits/ShinyText'
-import GradientText    from '../components/bits/GradientText'
+import Aurora from '../components/bits/Aurora'
+import GradientText from '../components/bits/GradientText'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton'
 
 export default function Login() {
@@ -47,84 +44,80 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-page" style={{ position: 'relative', overflow: 'hidden' }}>
-      <Aurora colorStops={['#001a13', '#00A884', '#001a13']} amplitude={0.8} blend={0.6} speed={0.6} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,20,26,0.72)', backdropFilter: 'blur(2px)', pointerEvents: 'none' }} />
+    <div className="auth-page">
+      <Aurora colorStops={['#001a13', '#00A884', '#001a13']} amplitude={0.8} blend={0.55} speed={0.6} />
+      <div className="auth-overlay" />
 
-      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440, margin: '0 24px' }}>
-        <StarBorder color="#00A884" speed="8s">
-          <SpotlightCard spotlightColor="rgba(0,168,132,0.2)">
-            <div style={{ padding: '40px 36px' }}>
+      <div ref={cardRef} className="auth-card-wrap">
+        <div className="auth-card">
+          {/* Logo */}
+          <div className="auth-field auth-logo">
+            <motion.div
+              className="auth-logo-icon"
+              animate={{ rotate: [0, -10, 10, 0] }}
+              transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 6 }}
+            >
+              💬
+            </motion.div>
+            <h1 className="auth-title">
+              <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>
+                WhatsApp
+              </GradientText>
+            </h1>
+            <p className="auth-subtitle">Sign in to continue</p>
+          </div>
 
-              {/* Logo */}
-              <div className="auth-field auth-logo">
-                <motion.span className="auth-logo-icon"
-                  animate={{ rotate: [0, -10, 10, 0] }}
-                  transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 5 }}
-                >💬</motion.span>
-                <h1 style={{ fontSize: 30, fontWeight: 800, marginBottom: 4 }}>
-                  <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>
-                    WhatsApp
-                  </GradientText>
-                </h1>
-                <p className="auth-subtitle">
-                  <ShinyText text="Sign in to continue" color="#667781" shineColor="#E9EDEF" speed={4} />
-                </p>
-              </div>
+          {/* Google Sign-In */}
+          <div className="auth-field" style={{ marginBottom: 4 }}>
+            <GoogleSignInButton label="Continue with Google" />
+          </div>
 
-              {/* Google Sign-In */}
-              <div className="auth-field" style={{ marginBottom: 4 }}>
-                <GoogleSignInButton label="Continue with Google" />
-              </div>
+          {/* Divider */}
+          <div className="auth-field auth-divider">
+            <div className="auth-divider-line" />
+            <span className="auth-divider-text">or sign in with email</span>
+            <div className="auth-divider-line" />
+          </div>
 
-              {/* Divider */}
-              <div className="auth-field" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0' }}>
-                <div style={{ flex: 1, height: 1, background: '#2A3942' }} />
-                <span style={{ fontSize: 12, color: '#667781', whiteSpace: 'nowrap' }}>or sign in with email</span>
-                <div style={{ flex: 1, height: 1, background: '#2A3942' }} />
-              </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="auth-form auth-field" id="login-form">
+            <AnimatePresence>
+              {error && (
+                <motion.div className="auth-error" role="alert"
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.22 }}
+                >{error}</motion.div>
+              )}
+            </AnimatePresence>
 
-              {/* Email/Password form */}
-              <form onSubmit={handleSubmit} className="auth-form" id="login-form">
-                <AnimatePresence>
-                  {error && (
-                    <motion.div className="auth-error" role="alert"
-                      initial={{ opacity: 0, y: -8, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: 'auto' }}
-                      exit={{ opacity: 0, y: -8, height: 0 }}
-                      transition={{ duration: 0.22 }}
-                    >{error}</motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="form-group auth-field">
-                  <label htmlFor="email">Email address</label>
-                  <input id="email" type="email" name="email" autoComplete="email"
-                    placeholder="you@example.com" value={form.email} onChange={handleChange} required />
-                </div>
-
-                <div className="form-group auth-field">
-                  <label htmlFor="password">Password</label>
-                  <input id="password" type="password" name="password" autoComplete="current-password"
-                    placeholder="••••••••" value={form.password} onChange={handleChange} required />
-                </div>
-
-                <motion.button id="login-btn" type="submit" className="btn-primary auth-field"
-                  disabled={loading}
-                  whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 30px rgba(0,168,132,0.5)' } : {}}
-                  whileTap={!loading ? { scale: 0.96 } : {}}
-                >
-                  {loading ? <span className="btn-spinner" /> : 'Sign In'}
-                </motion.button>
-              </form>
-
-              <p className="auth-switch auth-field" style={{ marginTop: 16 }}>
-                Don't have an account?{' '}
-                <Link to="/register" id="go-to-register">Create one</Link>
-              </p>
+            <div className="form-group">
+              <label htmlFor="email">Email address</label>
+              <input id="email" type="email" name="email" autoComplete="email"
+                placeholder="you@example.com" value={form.email} onChange={handleChange} required />
             </div>
-          </SpotlightCard>
-        </StarBorder>
+
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input id="password" type="password" name="password" autoComplete="current-password"
+                placeholder="••••••••" value={form.password} onChange={handleChange} required />
+            </div>
+
+            <motion.button id="login-btn" type="submit" className="btn-primary"
+              disabled={loading}
+              whileHover={!loading ? { scale: 1.02, boxShadow: '0 0 28px rgba(0,168,132,0.4)' } : {}}
+              whileTap={!loading ? { scale: 0.97 } : {}}
+            >
+              {loading ? <span className="btn-spinner" /> : 'Sign In'}
+            </motion.button>
+          </form>
+
+          <p className="auth-switch auth-field" style={{ marginTop: 16 }}>
+            Don't have an account?{' '}
+            <Link to="/register" id="go-to-register">Create one</Link>
+          </p>
+        </div>
       </div>
     </div>
   )

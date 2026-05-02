@@ -12,6 +12,8 @@ const includesUserId = (ids, userId) => (ids || []).some((id) => toIdString(id) 
 const getConversations = async (req, res, next) => {
   try {
     const myId = req.user._id
+    const pinnedIds = (req.user.pinnedConversations || []).map((id) => id.toString())
+    const starredIds = (req.user.starredConversations || []).map((id) => id.toString())
 
     const conversations = await Message.aggregate([
       // All messages involving me
@@ -83,7 +85,16 @@ const getConversations = async (req, res, next) => {
       },
     ])
 
-    res.status(200).json({ success: true, conversations })
+    const conversationsWithFlags = conversations.map((conversation) => {
+      const otherUserId = conversation.user._id.toString()
+      return {
+        ...conversation,
+        pinned: pinnedIds.includes(otherUserId),
+        starred: starredIds.includes(otherUserId),
+      }
+    })
+
+    res.status(200).json({ success: true, conversations: conversationsWithFlags })
   } catch (error) {
     next(error)
   }

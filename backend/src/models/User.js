@@ -65,6 +65,24 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    // Pinned conversations (for sidebar)
+    pinnedConversations: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
+    // Starred conversations (for favorites)
+    starredConversations: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
+    // Muted conversations
+    mutedConversations: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'User',
+      default: [],
+    },
   },
   {
     timestamps: true,

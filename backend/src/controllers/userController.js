@@ -103,4 +103,76 @@ const getPublicKey = async (req, res, next) => {
   }
 }
 
-module.exports = { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey }
+// @desc    Pin/unpin a conversation
+// @route   PATCH /api/users/pin-conversation/:userId
+// @access  Private
+const togglePinConversation = async (req, res, next) => {
+  try {
+    const { userId } = req.params
+    const currentUser = await User.findById(req.user._id)
+    
+    const isPinned = currentUser.pinnedConversations.some(id => id.toString() === userId)
+    
+    if (isPinned) {
+      currentUser.pinnedConversations = currentUser.pinnedConversations.filter(id => id.toString() !== userId)
+    } else {
+      currentUser.pinnedConversations.push(userId)
+    }
+    
+    await currentUser.save()
+    res.status(200).json({ success: true, pinned: !isPinned })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// @desc    Star/unstar a conversation (add to favorites)
+// @route   PATCH /api/users/star-conversation/:userId
+// @access  Private
+const toggleStarConversation = async (req, res, next) => {
+  try {
+    const { userId } = req.params
+    const currentUser = await User.findById(req.user._id)
+    
+    const isStarred = currentUser.starredConversations.some(id => id.toString() === userId)
+    
+    if (isStarred) {
+      currentUser.starredConversations = currentUser.starredConversations.filter(id => id.toString() !== userId)
+    } else {
+      currentUser.starredConversations.push(userId)
+    }
+    
+    await currentUser.save()
+    res.status(200).json({ success: true, starred: !isStarred })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// @desc    Mark all messages in a conversation as read
+// @route   PATCH /api/users/mark-conversation-read/:userId
+// @access  Private
+const markConversationRead = async (req, res, next) => {
+  try {
+    const { userId } = req.params
+    const Message = require('../models/Message')
+    
+    // Mark all messages from this user to current user as read
+    await Message.updateMany(
+      {
+        sender: userId,
+        receiver: req.user._id,
+        read: false,
+      },
+      {
+        $set: { read: true, readAt: new Date() },
+      }
+    )
+    
+    res.status(200).json({ success: true, message: 'Conversation marked as read.' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+module.exports = { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey, togglePinConversation, toggleStarConversation, markConversationRead }

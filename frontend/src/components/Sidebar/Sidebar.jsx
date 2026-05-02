@@ -5,6 +5,7 @@ import { Menu, Plus, Clock3, Star, LogOut, Users } from 'lucide-react'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import ShinyText    from '../bits/ShinyText'
 import GradientText from '../bits/GradientText'
+import { togglePinConversation, toggleStarConversation, markConversationRead } from '../../api'
 
 // ── Icons ────────────────────────────────────────────────────
 const SearchIcon = () => (
@@ -22,8 +23,123 @@ const MiniSpinner = () => (
   }} />
 )
 
+// ── Context menu ──────────────────────────────────────────────
+function ContextMenu({ position, conversation, onAddFavourite, onPin, onMarkAsRead, onClose }) {
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose?.()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
+
+  if (!position) return null
+
+  return (
+    <motion.div
+      ref={menuRef}
+      initial={{ opacity: 0, scale: 0.95, y: -8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.12 }}
+      style={{
+        position: 'fixed',
+        top: `${position.y}px`,
+        left: `${position.x}px`,
+        background: '#222B2F',
+        borderRadius: '8px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        zIndex: 1000,
+        minWidth: '160px',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => { onAddFavourite?.(); onClose?.() }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          width: '100%',
+          padding: '12px 16px',
+          border: 'none',
+          background: 'transparent',
+          color: '#E9EDEF',
+          fontSize: 13,
+          cursor: 'pointer',
+          transition: 'all 0.15s',
+          textAlign: 'left',
+        }}
+        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
+        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        Add to Favourites
+      </button>
+      <button
+        type="button"
+        onClick={() => { onPin?.(); onClose?.() }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          width: '100%',
+          padding: '12px 16px',
+          border: 'none',
+          background: 'transparent',
+          color: '#E9EDEF',
+          fontSize: 13,
+          cursor: 'pointer',
+          transition: 'all 0.15s',
+          textAlign: 'left',
+        }}
+        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
+        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 2l3 6h6l-5 4 2 6-6-5-6 5 2-6-5-4h6z"/>
+        </svg>
+        Pin Chat
+      </button>
+      <button
+        type="button"
+        onClick={() => { onMarkAsRead?.(); onClose?.() }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          width: '100%',
+          padding: '12px 16px',
+          border: 'none',
+          background: 'transparent',
+          color: '#E9EDEF',
+          fontSize: 13,
+          cursor: 'pointer',
+          transition: 'all 0.15s',
+          textAlign: 'left',
+        }}
+        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
+        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Mark as Read
+      </button>
+    </motion.div>
+  )
+}
+
 // ── Conversation item ────────────────────────────────────────
-function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, onClick }) {
+function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, onClick, onContextMenu }) {
   const { user, lastMessage, unreadCount } = conversation
 
   const initial = user.username?.[0]?.toUpperCase() || '?'
@@ -45,6 +161,10 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
   return (
     <motion.div
       onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(e, conversation)
+      }}
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2 }}
@@ -171,12 +291,15 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
 // ── Main Sidebar ─────────────────────────────────────────────
 export default function Sidebar({
   currentUser, conversations, selectedUser, onSelectUser,
-  onLogout, onOpenStarred, onOpenScheduled, onOpenGroups, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
+  onLogout, onOpenStarred, onOpenScheduled, onOpenGroups, onConversationPreferenceChange, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
   const showEmpty = conversations.length === 0
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
+  const [contextMenu, setContextMenu] = useState(null)
+  const [targetConversation, setTargetConversation] = useState(null)
   const menuRef = useRef(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const closeMenu = (event) => {
@@ -205,6 +328,73 @@ export default function Sidebar({
   }
 
   const displayConversations = getFilteredConversations()
+
+  const handleContextMenu = (e, conversation) => {
+    setTargetConversation(conversation)
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    })
+  }
+
+  const handleAddFavourite = async () => {
+    if (!targetConversation || saving) return
+    setSaving(true)
+    try {
+      const userId = targetConversation.user._id
+      if (onConversationPreferenceChange) {
+        await onConversationPreferenceChange({ userId, type: 'star' })
+      } else {
+        const { data } = await toggleStarConversation(userId)
+        console.log('Conversation starred/unstarred successfully', Boolean(data?.starred))
+      }
+    } catch (error) {
+      console.error('Failed to toggle star:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePin = async () => {
+    if (!targetConversation || saving) return
+    setSaving(true)
+    try {
+      const userId = targetConversation.user._id
+      if (onConversationPreferenceChange) {
+        await onConversationPreferenceChange({ userId, type: 'pin' })
+      } else {
+        const { data } = await togglePinConversation(userId)
+        console.log('Conversation pinned/unpinned successfully', Boolean(data?.pinned))
+      }
+    } catch (error) {
+      console.error('Failed to toggle pin:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleMarkAsRead = async () => {
+    if (!targetConversation || saving) return
+    setSaving(true)
+    try {
+      const userId = targetConversation.user._id
+      if (onConversationPreferenceChange) {
+        await onConversationPreferenceChange({ userId, type: 'read' })
+      } else {
+        await markConversationRead(userId)
+        console.log('Conversation marked as read successfully')
+      }
+    } catch (error) {
+      console.error('Failed to mark as read:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu(null)
+    setTargetConversation(null)
+  }
 
   return (
     <aside className="sidebar">
@@ -391,7 +581,7 @@ export default function Sidebar({
             style={{ padding: '6px 16px 2px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}
           >
             <GradientText colors={['#8696A0', '#00A884', '#8696A0']} animationSpeed={14}>
-              {isSearchMode ? `Results (${displayConversations.length})` : 'Recent Chats'}
+              {isSearchMode ? `Results (${displayConversations.length})` : activeFilter === 'favourites' ? 'Favourites' : 'Recent Chats'}
             </GradientText>
           </motion.div>
         )}
@@ -413,12 +603,27 @@ export default function Sidebar({
                     isHighlighted={idx === highlightedIndex}
                     isOnline={isOnline}
                     onClick={() => onSelectUser(conv.user)}
+                    onContextMenu={handleContextMenu}
                   />
                 ))}
               </motion.div>
           }
         </AnimatePresence>
       </div>
+
+      {/* Context menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <ContextMenu
+            position={contextMenu}
+            conversation={targetConversation}
+            onAddFavourite={handleAddFavourite}
+            onPin={handlePin}
+            onMarkAsRead={handleMarkAsRead}
+            onClose={closeContextMenu}
+          />
+        )}
+      </AnimatePresence>
     </aside>
   )
 }

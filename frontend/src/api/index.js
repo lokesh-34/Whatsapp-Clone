@@ -54,4 +54,9 @@ export const sendGroupMessage = (groupId, payload) => API.post(`/groups/${groupI
 export const getPublicKey     = (userId)         => API.get(`/users/public-key/${userId}`)
 export const postPublicKey    = (publicKey)      => API.post('/users/public-key', { publicKey })
 
+// ── Conversation Preferences ────────────────────────────────
+export const togglePinConversation = (userId)  => API.patch(`/users/pin-conversation/${userId}`)
+export const toggleStarConversation = (userId) => API.patch(`/users/star-conversation/${userId}`)
+export const markConversationRead = (userId)   => API.patch(`/users/mark-conversation-read/${userId}`)
+
 export default API

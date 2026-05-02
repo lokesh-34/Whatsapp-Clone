@@ -4,11 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
 import { sendOtp, verifyOtp, registerUser } from '../api'
 import { useAuth } from '../context/AuthContext'
-import Aurora           from '../components/bits/Aurora'
-import SpotlightCard    from '../components/bits/SpotlightCard'
-import StarBorder       from '../components/bits/StarBorder'
-import ShinyText        from '../components/bits/ShinyText'
-import GradientText     from '../components/bits/GradientText'
+import Aurora from '../components/bits/Aurora'
+import GradientText from '../components/bits/GradientText'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton'
 
 /* ── Step bar ──────────────────────────────────────────────── */
@@ -243,33 +240,33 @@ export default function Register() {
   ]
 
   return (
-    <div className="auth-page" style={{ position: 'relative', overflow: 'hidden' }}>
+    <div className="auth-page">
       <Aurora colorStops={['#001a13', '#00A884', '#003d2e']} amplitude={0.9} blend={0.55} speed={0.5} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,20,26,0.72)', backdropFilter: 'blur(2px)', pointerEvents: 'none' }} />
+      <div className="auth-overlay" />
 
-      <div ref={cardRef} style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 460, margin: '0 24px' }}>
-        <StarBorder color="#00A884" speed="8s">
-          <SpotlightCard spotlightColor="rgba(0,168,132,0.18)">
-            <div style={{ padding: '36px 36px 32px' }}>
+      <div ref={cardRef} className="auth-card-wrap" style={{ maxWidth: 460 }}>
+        <div className="auth-card">
 
-              {/* Logo */}
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <motion.span style={{ fontSize: 40, display: 'block', marginBottom: 6 }}
-                  animate={{ rotate: [0, -10, 10, 0] }}
-                  transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 5 }}>💬</motion.span>
-                <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 4px' }}>
-                  <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>WhatsApp</GradientText>
-                </h1>
-                <p style={{ margin: 0, fontSize: 13 }}>
-                  <ShinyText text={stepSubs[step]} color="#667781" shineColor="#E9EDEF" speed={4} />
-                </p>
-              </div>
+          {/* Logo */}
+          <div className="auth-logo">
+            <motion.div
+              className="auth-logo-icon"
+              animate={{ rotate: [0, -10, 10, 0] }}
+              transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 6 }}
+            >
+              💬
+            </motion.div>
+            <h1 className="auth-title">
+              <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>WhatsApp</GradientText>
+            </h1>
+            <p className="auth-subtitle">{stepSubs[step]}</p>
+          </div>
 
-              <StepBar current={step} />
+          <StepBar current={step} />
 
-              <h2 style={{ margin: '0 0 16px', fontSize: 17, fontWeight: 700, color: '#E9EDEF', textAlign: 'center' }}>
-                {['Verify Email', 'Enter Code', 'Create Account'][step]}
-              </h2>
+          <h2 style={{ margin: '0 0 16px', fontSize: 17, fontWeight: 700, color: '#E9EDEF', textAlign: 'center' }}>
+            {['Verify Email', 'Enter Code', 'Create Account'][step]}
+          </h2>
 
               {/* Dev-mode notice */}
               <AnimatePresence>
@@ -401,13 +398,11 @@ export default function Register() {
                 )}
               </AnimatePresence>
 
-              <p className="auth-switch" style={{ marginTop: 18 }}>
-                Already have an account?{' '}
-                <Link to="/login" id="go-to-login">Sign in</Link>
-              </p>
-            </div>
-          </SpotlightCard>
-        </StarBorder>
+          <p className="auth-switch" style={{ marginTop: 18 }}>
+            Already have an account?{' '}
+            <Link to="/login" id="go-to-login">Sign in</Link>
+          </p>
+        </div>
       </div>
     </div>
   )
