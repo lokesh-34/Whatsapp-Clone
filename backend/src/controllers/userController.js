@@ -24,9 +24,10 @@ const searchUsers = async (req, res, next) => {
       $or: [
         { username: regex },
         { email: regex },
+        { phone: regex },
       ],
     })
-      .select('_id username email avatarColor isOnline lastSeen')
+      .select('_id username email phone avatarColor isOnline lastSeen')
       .limit(15)
       .sort({ username: 1 })
 

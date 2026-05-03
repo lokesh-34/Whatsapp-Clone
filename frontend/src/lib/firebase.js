@@ -21,8 +21,8 @@ export const firebaseApp = isFirebaseConfigured
 export const auth           = isFirebaseConfigured ? getAuth(firebaseApp) : null
 export const googleProvider = isFirebaseConfigured ? new GoogleAuthProvider() : null
 
-// Messaging disabled — no service worker, no FCM push tokens
-export const messaging  = null
-export const onMessage  = () => () => {}
+// Messaging disabled
+export const messaging = null
+export const onMessage = () => () => {}
 
 export { firebaseConfig }

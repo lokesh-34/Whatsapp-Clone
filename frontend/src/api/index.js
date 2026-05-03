@@ -13,12 +13,14 @@ API.interceptors.request.use((config) => {
 })
 
 // ── Auth ─────────────────────────────────────────────────────
-export const sendOtp      = (email)           => API.post('/auth/send-otp',     { email })
-export const verifyOtp    = (email, otp)      => API.post('/auth/verify-otp',   { email, otp })
-export const registerUser = (data)            => API.post('/auth/register',     data)
-export const loginUser    = (data)            => API.post('/auth/login',        data)
-export const googleLogin  = (idToken)         => API.post('/auth/google-login', { idToken })
-export const getMe        = ()                => API.get('/auth/me')
+export const sendOtp        = (payload)         => API.post('/auth/send-otp',        payload)
+export const verifyOtp      = (payload)         => API.post('/auth/verify-otp',      payload)
+export const registerUser   = (data)            => API.post('/auth/register',        data)
+export const loginUser      = (data)            => API.post('/auth/login',           data)
+export const googleLogin    = (idToken)         => API.post('/auth/google-login',    { idToken })
+export const phoneRegister  = (data)            => API.post('/auth/phone-register',  data)  // { idToken, username, password }
+export const phoneLogin     = (idToken)         => API.post('/auth/phone-login',     { idToken })
+export const getMe          = ()                => API.get('/auth/me')
 
 // ── Users ────────────────────────────────────────────────────
 export const searchUsers  = (q)               => API.get(`/users/search?q=${encodeURIComponent(q)}`)

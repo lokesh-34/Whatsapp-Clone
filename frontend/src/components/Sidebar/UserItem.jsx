@@ -27,7 +27,15 @@ export default function UserItem({ user, isSelected, isOnline, unreadCount, onCl
 
       <div className="user-item-info">
         <span className="user-item-name">{user.username}</span>
-        <span className="user-item-status">{isOnline ? 'Online' : 'Offline'}</span>
+        <span className="user-item-status">
+          {user.phone ? (
+            <span style={{ color: '#ff9800', fontSize: 11, fontWeight: 600 }}>
+              📱 {user.phone}
+            </span>
+          ) : (
+            isOnline ? 'Online' : 'Offline'
+          )}
+        </span>
       </div>
 
       {unreadCount > 0 && (

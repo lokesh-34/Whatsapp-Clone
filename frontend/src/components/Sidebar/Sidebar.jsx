@@ -272,7 +272,7 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
     <div className="sidebar-empty" ref={ref}>
       <div style={{ fontSize: 30, marginBottom: 10 }}>🔍</div>
       <p style={{ fontWeight: 600, color: 'var(--wa-text-primary)', fontSize: 14, marginBottom: 4 }}>No users found</p>
-      <p style={{ fontSize: 13 }}>Try a different username or email</p>
+      <p style={{ fontSize: 13 }}>Try a different username, email, or phone number</p>
     </div>
   )
   return (
@@ -281,8 +281,9 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
         animate={{ y: [0, -8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>🔍</motion.div>
       <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--wa-text-primary)', marginBottom: 8 }}>Find someone to chat with</p>
       <p style={{ fontSize: 13, color: 'var(--wa-text-muted)', lineHeight: 1.6 }}>
-        Search by <strong style={{ color: 'var(--wa-text-secondary)' }}>username</strong> or{' '}
-        <strong style={{ color: 'var(--wa-text-secondary)' }}>email</strong>
+        Search by <strong style={{ color: 'var(--wa-text-secondary)' }}>username</strong>,{' '}
+        <strong style={{ color: 'var(--wa-text-secondary)' }}>email</strong>, or{' '}
+        <strong style={{ color: '#ff9800' }}>phone number</strong>
       </p>
     </div>
   )

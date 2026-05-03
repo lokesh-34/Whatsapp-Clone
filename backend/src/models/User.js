@@ -19,6 +19,14 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
+    phone: {
+      type: String,
+      required: false,
+      unique: true,
+      trim: true,
+      sparse: true,
+      match: [/^\+[1-9]\d{6,14}$/, 'Please enter a valid phone number in E.164 format'],
+    },
     password: {
       type: String,
       required: false,   // Optional for Google-login users
@@ -54,6 +62,15 @@ const userSchema = new mongoose.Schema(
       default: null,
       index: true,
       sparse: true,
+    },
+    phone: {
+      type: String,
+      default: null,
+      trim: true,
+      sparse: true,
+      index: true,
+      // E.164 format: +91XXXXXXXXXX
+      match: [/^\+[1-9]\d{6,14}$/, 'Phone must be in E.164 format (e.g. +919876543210)'],
     },
     avatar: {
       type: String,   // Google profile picture URL

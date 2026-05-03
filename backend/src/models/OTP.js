@@ -1,15 +1,24 @@
 const mongoose = require('mongoose')
 
 const otpSchema = new mongoose.Schema({
+  // At least one of email or phone is required (enforced in controller)
   email: {
     type: String,
-    required: true,
+    default: null,
     lowercase: true,
     trim: true,
     index: true,
+    sparse: true,
+  },
+  phone: {
+    type: String,
+    default: null,
+    trim: true,
+    index: true,
+    sparse: true,
   },
   otp: {
-    type: String, // stored as plain (short-lived, low-risk) – or hash if preferred
+    type: String, // stored as plain (short-lived, low-risk)
     required: true,
   },
   verified: {

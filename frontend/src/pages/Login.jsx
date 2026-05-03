@@ -8,13 +8,19 @@ import Aurora from '../components/bits/Aurora'
 import GradientText from '../components/bits/GradientText'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton'
 
+const looksLikePhone = (val) => /^\+/.test(val.trim())
+
 export default function Login() {
-  const navigate        = useNavigate()
-  const { login }       = useAuth()
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const cardRef = useRef(null)
+  const navigate  = useNavigate()
+  const { login } = useAuth()
+  const cardRef   = useRef(null)
+
+  const [identifier, setIdentifier] = useState('')
+  const [password,   setPassword]   = useState('')
+  const [error,      setError]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+
+  const isPhone = looksLikePhone(identifier)
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -22,25 +28,27 @@ export default function Login() {
         { y: 70, opacity: 0, scale: 0.93 },
         { y: 0, opacity: 1, scale: 1, duration: 0.9, ease: 'back.out(1.5)' }
       )
-      gsap.fromTo('.auth-field',
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.55, stagger: 0.1, delay: 0.4, ease: 'power3.out' }
-      )
     })
     return () => ctx.revert()
   }, [])
 
-  const handleChange = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-
   const handleSubmit = async (e) => {
-    e.preventDefault(); setError(''); setLoading(true)
+    e.preventDefault()
+    setError(''); setLoading(true)
+    
     try {
-      const { data } = await loginUser(form)
+      const payload = isPhone 
+        ? { phone: identifier.trim(), password }
+        : { email: identifier.trim(), password }
+        
+      const { data } = await loginUser(payload)
       login(data.user, data.token)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.')
-    } finally { setLoading(false) }
+      setError(err.response?.data?.message || 'Login failed. Check your credentials.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -50,72 +58,66 @@ export default function Login() {
 
       <div ref={cardRef} className="auth-card-wrap">
         <div className="auth-card">
-          {/* Logo */}
-          <div className="auth-field auth-logo">
-            <motion.div
-              className="auth-logo-icon"
-              animate={{ rotate: [0, -10, 10, 0] }}
-              transition={{ duration: 1.6, delay: 1, repeat: Infinity, repeatDelay: 6 }}
-            >
-              💬
-            </motion.div>
+          <div className="auth-logo">
             <h1 className="auth-title">
-              <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>
-                WhatsApp
-              </GradientText>
+              <GradientText colors={['#00A884', '#4ECDC4', '#00d4aa', '#00A884']} animationSpeed={5}>WhatsApp</GradientText>
             </h1>
-            <p className="auth-subtitle">Sign in to continue</p>
+            <p className="auth-subtitle">Sign in to your account</p>
           </div>
 
-          {/* Google Sign-In */}
-          <div className="auth-field" style={{ marginBottom: 4 }}>
-            <GoogleSignInButton label="Continue with Google" />
-          </div>
+          <GoogleSignInButton label="Continue with Google" />
 
-          {/* Divider */}
-          <div className="auth-field auth-divider">
+          <div className="auth-divider">
             <div className="auth-divider-line" />
-            <span className="auth-divider-text">or sign in with email</span>
+            <span className="auth-divider-text">or sign in with password</span>
             <div className="auth-divider-line" />
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="auth-form auth-field" id="login-form">
+          <form onSubmit={handleSubmit} className="auth-form" id="login-form">
             <AnimatePresence>
               {error && (
-                <motion.div className="auth-error" role="alert"
-                  initial={{ opacity: 0, y: -8, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -8, height: 0 }}
-                  transition={{ duration: 0.22 }}
-                >{error}</motion.div>
+                <motion.div className="auth-error" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+                  {error}
+                </motion.div>
               )}
             </AnimatePresence>
 
             <div className="form-group">
-              <label htmlFor="email">Email address</label>
-              <input id="email" type="email" name="email" autoComplete="email"
-                placeholder="you@example.com" value={form.email} onChange={handleChange} required />
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Email or Mobile number</span>
+                {identifier && (
+                  <span style={{ fontSize: '10px', color: isPhone ? '#ff9800' : '#4ECDC4', fontWeight: 700 }}>
+                    {isPhone ? '📱 PHONE' : '✉️ EMAIL'}
+                  </span>
+                )}
+              </label>
+              <input 
+                type="text" 
+                placeholder="you@example.com or +91XXXXXXXXXX"
+                value={identifier}
+                onChange={(e) => { setIdentifier(e.target.value); setError('') }}
+                required 
+              />
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input id="password" type="password" name="password" autoComplete="current-password"
-                placeholder="••••••••" value={form.password} onChange={handleChange} required />
+              <label>Password</label>
+              <input 
+                type="password" 
+                placeholder="••••••••" 
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError('') }}
+                required 
+              />
             </div>
 
-            <motion.button id="login-btn" type="submit" className="btn-primary"
-              disabled={loading}
-              whileHover={!loading ? { scale: 1.02, boxShadow: '0 0 28px rgba(0,168,132,0.4)' } : {}}
-              whileTap={!loading ? { scale: 0.97 } : {}}
-            >
-              {loading ? <span className="btn-spinner" /> : 'Sign In'}
-            </motion.button>
+            <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '10px' }}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
           </form>
 
-          <p className="auth-switch auth-field" style={{ marginTop: 16 }}>
-            Don't have an account?{' '}
-            <Link to="/register" id="go-to-register">Create one</Link>
+          <p className="auth-switch">
+            Don't have an account? <Link to="/register">Create one</Link>
           </p>
         </div>
       </div>
