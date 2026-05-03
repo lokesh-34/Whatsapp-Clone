@@ -109,6 +109,16 @@ To enable Google Login and token verification:
 
 ---
 
+## 📸 Project Showcase
+
+> [!TIP]
+> **To the Interviewer:** This project features a custom-built Glassmorphism UI. Key visual highlights include:
+> - **Real-time Chat Interface**: Transparent message bubbles with backdrop-blur effects.
+> - **Dynamic Sidebars**: Smooth transitions between chats and group management.
+> - **Authentication UI**: Intuitive multi-path login screens with animated transitions.
+
+---
+
 ## 🛠️ Challenges Faced & Solutions
 
 - **Challenge**: Handling socket reconnections without losing message state.

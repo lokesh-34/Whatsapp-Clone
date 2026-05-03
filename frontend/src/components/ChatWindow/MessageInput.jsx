@@ -111,27 +111,48 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
     return () => window.removeEventListener('keydown', handleGlobalEscape)
   }, [isRecording])
 
-  const handleChange = (e) => {
-    setText(e.target.value)
-    if (socket && selectedUser) {
-      if (!typing) {
-        setTyping(true)
-        if (selectedUser.isGroup) {
-          socket.emit('typing', { groupId: selectedUser._id })
-        } else {
-          socket.emit('typing', { to: selectedUser._id })
-        }
-      }
-      clearTimeout(typingTimer.current)
-      typingTimer.current = setTimeout(() => {
+  useEffect(() => {
+    if (!socket || !selectedUser) return
+
+    const hasContent = text.trim().length > 0
+
+    clearTimeout(typingTimer.current)
+
+    if (!hasContent) {
+      if (typing) {
         setTyping(false)
         if (selectedUser.isGroup) {
           socket.emit('stopTyping', { groupId: selectedUser._id })
         } else {
           socket.emit('stopTyping', { to: selectedUser._id })
         }
-      }, 1500)
+      }
+      return
     }
+
+    if (!typing) {
+      setTyping(true)
+      if (selectedUser.isGroup) {
+        socket.emit('typing', { groupId: selectedUser._id })
+      } else {
+        socket.emit('typing', { to: selectedUser._id })
+      }
+    }
+
+    typingTimer.current = setTimeout(() => {
+      setTyping(false)
+      if (selectedUser.isGroup) {
+        socket.emit('stopTyping', { groupId: selectedUser._id })
+      } else {
+        socket.emit('stopTyping', { to: selectedUser._id })
+      }
+    }, 1500)
+
+    return () => clearTimeout(typingTimer.current)
+  }, [text, socket, selectedUser])
+
+  const handleChange = (e) => {
+    setText(e.target.value)
   }
 
   const handleSend = (content, messageType = 'text', metadata = {}) => {

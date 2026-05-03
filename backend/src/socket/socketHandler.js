@@ -242,7 +242,15 @@ const socketHandler = (io) => {
         )
 
         if (result.modifiedCount > 0) {
+          // Fetch the IDs of the messages that were just updated
+          const updatedMessages = await Message.find({
+            sender: from,
+            receiver: userId,
+            readAt: now
+          }).select('_id')
+
           io.to(from.toString()).emit('messageStatusUpdated', {
+            messageIds: updatedMessages.map(m => m._id),
             senderId: from,
             receiverId: userId,
             read: true,

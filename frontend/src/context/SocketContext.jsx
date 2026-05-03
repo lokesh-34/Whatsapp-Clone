@@ -1,3 +1,14 @@
+/**
+ * ─── SOCKET CONTEXT ──────────────────────────────────────────────────────────
+ * Manages the global WebSocket lifecycle and presence state.
+ * 
+ * Key Responsibilities:
+ * 1. Connection Management: Establishes and tears down the socket connection 
+ *    based on the user's authentication state.
+ * 2. Presence Tracking: Maintains a real-time list of online users.
+ * 3. Security: Injects the JWT token into the socket handshake for server-side auth.
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from './AuthContext'
