@@ -194,7 +194,7 @@ a:hover { text-decoration: underline; }
   padding: 13px; font-size: 15px; font-weight: 700;
   transition: filter 150ms, transform 150ms, box-shadow 150ms;
   display: flex; align-items: center; justify-content: center;
-  margin-top: 4px; height: 48px;
+  margin-top: 4px; height: 48px; width: 100%; align-self: stretch;
   box-shadow: 0 8px 20px rgba(0,168,132,.25);
 }
 .btn-primary:hover:not(:disabled) {

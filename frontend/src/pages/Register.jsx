@@ -141,7 +141,7 @@ export default function Register() {
           <AnimatePresence mode="wait">
             {/* Step 0: Contact Input */}
             {step === 0 && (
-              <motion.form key="s0" onSubmit={handleInitialSubmit} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <motion.form key="s0" className="auth-form" onSubmit={handleInitialSubmit} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <div className="form-group">
                   <label>Email or Mobile number</label>
                   <input
@@ -156,14 +156,18 @@ export default function Register() {
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? 'Processing...' : 'Continue →'}
                 </button>
-                <div className="auth-divider"><span className="auth-divider-text">or</span></div>
+                <div className="auth-divider" style={{ margin: '14px 0 10px' }}>
+                  <div className="auth-divider-line" />
+                  <span className="auth-divider-text">or</span>
+                  <div className="auth-divider-line" />
+                </div>
                 <GoogleSignInButton label="Sign up with Google" />
               </motion.form>
             )}
 
             {/* Step 1: Email OTP (Only for email) */}
             {step === 1 && (
-              <motion.form key="s1" onSubmit={handleVerifyEmailOtp} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <motion.form key="s1" className="auth-form" onSubmit={handleVerifyEmailOtp} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <div className="form-group">
                   <label>Enter 6-digit code sent to {contact}</label>
                   <input
@@ -183,7 +187,7 @@ export default function Register() {
 
             {/* Step 2: Final Details */}
             {step === 2 && (
-              <motion.form key="s2" onSubmit={handleRegister} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <motion.form key="s2" className="auth-form" onSubmit={handleRegister} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <div className="form-group">
                   <label>Username</label>
                   <input
@@ -211,7 +215,7 @@ export default function Register() {
             )}
           </AnimatePresence>
 
-          <p className="auth-switch">
+          <p className="auth-switch" style={{ marginTop: 24 }}>
             Already have an account? <Link to="/login">Sign in</Link>
           </p>
         </div>

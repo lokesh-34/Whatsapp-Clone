@@ -63,15 +63,6 @@ const userSchema = new mongoose.Schema(
       index: true,
       sparse: true,
     },
-    phone: {
-      type: String,
-      default: null,
-      trim: true,
-      sparse: true,
-      index: true,
-      // E.164 format: +91XXXXXXXXXX
-      match: [/^\+[1-9]\d{6,14}$/, 'Phone must be in E.164 format (e.g. +919876543210)'],
-    },
     avatar: {
       type: String,   // Google profile picture URL
       default: null,
