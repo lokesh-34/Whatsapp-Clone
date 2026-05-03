@@ -316,7 +316,8 @@ function EmptyState({ isSearchMode, searchLoading, query, activeFilter }) {
 export default function Sidebar({
   currentUser, conversations, selectedUser, onSelectUser,
   onLogout, onOpenStarred, onOpenScheduled, onOpenGroups, onConversationPreferenceChange, isOnline, searchQuery, onSearch, isSearchMode, searchLoading,  highlightedIndex = -1,}) {
-  const showEmpty = conversations.length === 0
+  const normalizedConversations = Array.isArray(conversations) ? conversations : []
+  const showEmpty = normalizedConversations.length === 0
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
@@ -336,18 +337,18 @@ export default function Sidebar({
   }, [])
 
   const getFilteredConversations = () => {
-    if (isSearchMode) return conversations
+    if (isSearchMode) return normalizedConversations
     
     switch (activeFilter) {
       case 'unread':
-        return conversations.filter(conv => conv.unreadCount > 0)
+        return normalizedConversations.filter(conv => conv.unreadCount > 0)
       case 'groups':
-        return conversations.filter(conv => conv.isGroup)
+        return normalizedConversations.filter(conv => conv.isGroup)
       case 'favourites':
-        return conversations.filter(conv => conv.starred)
+        return normalizedConversations.filter(conv => conv.starred)
       case 'all':
       default:
-        return conversations
+        return normalizedConversations
     }
   }
 

@@ -60,5 +60,6 @@ export const postPublicKey    = (publicKey)      => API.post('/users/public-key'
 export const togglePinConversation = (userId)  => API.patch(`/users/pin-conversation/${userId}`)
 export const toggleStarConversation = (userId) => API.patch(`/users/star-conversation/${userId}`)
 export const markConversationRead = (userId)   => API.patch(`/users/mark-conversation-read/${userId}`)
+export const registerPushToken = (token)        => API.post('/users/push-token', { token })
 
 export default API
