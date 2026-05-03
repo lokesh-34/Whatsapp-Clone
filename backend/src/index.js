@@ -1,3 +1,14 @@
+/**
+ * ─── APPLICATION ENTRY POINT ──────────────────────────────────────────────────
+ * This server implements a hybrid real-time architecture using Express for 
+ * RESTful API endpoints and Socket.IO for duplex communication.
+ * 
+ * Key layers:
+ * 1. Security: CORS, JSON limiting, and JWT-based Auth.
+ * 2. Real-time: Integrated Socket.IO server sharing the HTTP transport.
+ * 3. Documentation: Automated Swagger/OpenAPI documentation generation.
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
 require('dotenv').config();
 const express = require('express');
 const http = require('http');

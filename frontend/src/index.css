@@ -1321,13 +1321,12 @@ a:hover { text-decoration: underline; }
 
 .emoji-picker {
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 72px);
   left: 0;
   background: var(--wa-teal-header);
   border: 1px solid var(--wa-divider);
   border-radius: var(--radius-md);
   padding: 12px;
-  margin-bottom: 8px;
   z-index: 50;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   width: 300px;

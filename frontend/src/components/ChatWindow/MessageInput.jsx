@@ -419,7 +419,8 @@ export default function MessageInput({ onSend, selectedUser, editingMessage, onS
                       <motion.button
                         key={idx}
                         className="emoji-item"
-                        onClick={() => handleEmojiSend(emoji)}
+                        type="button"
+                        onClick={() => addEmoji(emoji)}
                         whileHover={{ scale: 1.3 }}
                         whileTap={{ scale: 0.8 }}
                       >
