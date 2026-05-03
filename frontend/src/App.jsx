@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Chat from './pages/Chat'
+import PushNotificationManager from './components/PushNotificationManager'
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -32,13 +33,16 @@ const PublicRoute = ({ children }) => {
 export default function App() {
   const location = useLocation()
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/login"    element={<PublicRoute><PageWrapper><Login /></PageWrapper></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><PageWrapper><Register /></PageWrapper></PublicRoute>} />
-        <Route path="/"         element={<ProtectedRoute><PageWrapper><Chat /></PageWrapper></ProtectedRoute>} />
-        <Route path="*"         element={<Navigate to="/" replace />} />
-      </Routes>
-    </AnimatePresence>
+    <>
+      <PushNotificationManager />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login"    element={<PublicRoute><PageWrapper><Login /></PageWrapper></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><PageWrapper><Register /></PageWrapper></PublicRoute>} />
+          <Route path="/"         element={<ProtectedRoute><PageWrapper><Chat /></PageWrapper></ProtectedRoute>} />
+          <Route path="*"         element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatePresence>
+    </>
   )
 }

@@ -46,4 +46,4 @@ const verifyIdToken = async (idToken) => {
   }
 }
 
-module.exports = { isFirebaseConfigured, verifyIdToken }
+module.exports = { isFirebaseConfigured, verifyIdToken, getAdmin }

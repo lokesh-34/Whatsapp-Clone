@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
+import { getMessaging, getToken, onMessage } from 'firebase/messaging'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,8 +22,27 @@ export const firebaseApp = isFirebaseConfigured
 export const auth           = isFirebaseConfigured ? getAuth(firebaseApp) : null
 export const googleProvider = isFirebaseConfigured ? new GoogleAuthProvider() : null
 
-// Messaging disabled
-export const messaging = null
-export const onMessage = () => () => {}
+// Messaging — for Push Notifications
+export const messaging = isFirebaseConfigured ? getMessaging(firebaseApp) : null
 
-export { firebaseConfig }
+/**
+ * Request notification permission and get FCM token
+ */
+export const requestForToken = async () => {
+  if (!messaging) return null
+  try {
+    const permission = await Notification.requestPermission()
+    if (permission === 'granted') {
+      const token = await getToken(messaging, {
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, // Needs to be generated in Firebase Console
+      })
+      if (token) return token
+      console.warn('No registration token available. Request permission to generate one.')
+    }
+  } catch (err) {
+    console.error('An error occurred while retrieving token:', err)
+  }
+  return null
+}
+
+export { onMessage, firebaseConfig }
