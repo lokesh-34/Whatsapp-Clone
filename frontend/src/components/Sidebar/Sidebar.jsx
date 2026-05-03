@@ -256,11 +256,11 @@ function ConversationItem({ conversation, isSelected, isHighlighted, isOnline, o
 }
 
 // ── Empty states ─────────────────────────────────────────────
-function EmptyState({ isSearchMode, searchLoading, query }) {
+function EmptyState({ isSearchMode, searchLoading, query, activeFilter }) {
   const ref = useRef(null)
   useEffect(() => {
     if (ref.current) gsap.fromTo(ref.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35 })
-  }, [isSearchMode, query])
+  }, [isSearchMode, query, activeFilter])
 
   if (searchLoading) return (
     <div className="sidebar-empty" ref={ref}>
@@ -275,6 +275,29 @@ function EmptyState({ isSearchMode, searchLoading, query }) {
       <p style={{ fontSize: 13 }}>Try a different username, email, or phone number</p>
     </div>
   )
+
+  if (activeFilter === 'favourites') return (
+    <div className="sidebar-empty" ref={ref} style={{ padding: '40px 20px' }}>
+      <motion.div style={{ fontSize: 38, marginBottom: 14 }}
+        animate={{ y: [0, -8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>⭐</motion.div>
+      <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--wa-text-primary)', marginBottom: 8 }}>No favourites found</p>
+      <p style={{ fontSize: 13, color: 'var(--wa-text-muted)', lineHeight: 1.6 }}>
+        Star a chat from the conversation menu to see it here.
+      </p>
+    </div>
+  )
+
+  if (activeFilter === 'groups') return (
+    <div className="sidebar-empty" ref={ref} style={{ padding: '40px 20px' }}>
+      <motion.div style={{ fontSize: 38, marginBottom: 14 }}
+        animate={{ y: [0, -8, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>👥</motion.div>
+      <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--wa-text-primary)', marginBottom: 8 }}>No groups found</p>
+      <p style={{ fontSize: 13, color: 'var(--wa-text-muted)', lineHeight: 1.6 }}>
+        Create a group to start chatting with multiple people.
+      </p>
+    </div>
+  )
+
   return (
     <div className="sidebar-empty" ref={ref} style={{ padding: '40px 20px' }}>
       <motion.div style={{ fontSize: 38, marginBottom: 14 }}
@@ -593,7 +616,7 @@ export default function Sidebar({
         <AnimatePresence mode="wait">
           {displayConversations.length === 0 && !isSearchMode
             ? <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <EmptyState isSearchMode={isSearchMode} searchLoading={searchLoading} query={searchQuery} />
+                <EmptyState isSearchMode={isSearchMode} searchLoading={searchLoading} query={searchQuery} activeFilter={activeFilter} />
               </motion.div>
             : <motion.div key="list">
                 {displayConversations.map((conv, idx) => (
