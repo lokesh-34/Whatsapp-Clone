@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # Database Service
+  mongodb:
+    image: mongo:latest
+    container_name: whatsapp_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - whatsapp_network
+
+  # Backend Service
+  backend:
+    build: ./backend
+    container_name: whatsapp_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/whatsapp_clone
+      - PORT=5000
+      - NODE_ENV=production
+      # Note: Sensitive vars like JWT_SECRET and FIREBASE_* 
+      # should be in your backend/.env file which Docker will read if specified,
+      # but for ease of use we'll assume they are available to the container.
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongodb
+    networks:
+      - whatsapp_network
+
+  # Frontend Service
+  frontend:
+    build: ./frontend
+    container_name: whatsapp_frontend
+    ports:
+      - "80:80"
+    env_file:
+      - ./frontend/.env
+    depends_on:
+      - backend
+    networks:
+      - whatsapp_network
+
+networks:
+  whatsapp_network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

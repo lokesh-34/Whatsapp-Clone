@@ -89,6 +89,24 @@ To enable Google Login and token verification:
 
 ---
 
+## 🐳 Docker Deployment (Recommended)
+
+The easiest way to run the entire stack (Frontend, Backend, and MongoDB) is using Docker Compose.
+
+### **Quick Start**
+1. Ensure you have **Docker** and **Docker Compose** installed.
+2. Configure your `.env` files in both `backend/` and `frontend/` folders.
+3. Run the following command in the root directory:
+   ```bash
+   docker-compose up --build
+   ```
+4. Access the application:
+   - **Frontend**: [http://localhost:80](http://localhost:80)
+   - **Backend API**: [http://localhost:5000](http://localhost:5000)
+   - **API Docs**: [http://localhost:5000/api-docs](http://localhost:5000/api-docs)
+
+---
+
 ## 📂 Project Structure
 
 ```
