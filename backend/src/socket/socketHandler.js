@@ -165,6 +165,7 @@ const socketHandler = (io) => {
         })
 
         await message.populate('sender', 'username avatarColor avatar')
+        await message.populate('group', 'name avatar description')
 
         const messageObj = message.toObject()
 

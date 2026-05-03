@@ -8,6 +8,7 @@ import StarredMessages from '../components/ChatWindow/StarredMessages'
 import GroupManager from '../components/GroupManager/GroupManager'
 import { getMessages, sendMessage, searchUsers, getConversations, editMessage, getUsers, forwardMessage, getGroups, getGroupMessages, sendGroupMessage, togglePinConversation, toggleStarConversation, markConversationRead } from '../api'
 import e2ee from '../lib/e2ee'
+import useChatStore from '../store/useChatStore'
 
 /* ── Debounce hook ─────────────────────────────────────────── */
 function useDebounce(value, delay = 350) {
@@ -19,10 +20,19 @@ function useDebounce(value, delay = 350) {
   return debounced
 }
 
-/* ── Chat Page ─────────────────────────────────────────────── */
 export default function Chat() {
   const { user, logout }     = useAuth()
   const { socket, isOnline } = useSocket()
+  
+  // ── Zustand Store ─────────────────────────────────────────
+  const { 
+    selectedUser, setSelectedUser,
+    messages, setMessages, addMessage,
+    recentChats, setRecentChats,
+    loadingMsgs, setLoadingMsgs,
+    updateMessageStatus, updateMessage, removeMessage,
+    updateConversation, bumpConversation
+  } = useChatStore()
 
   const getPreviewText = (messageType, content) => {
     if (messageType === 'voice') return '🎤 Voice message'
@@ -33,20 +43,18 @@ export default function Chat() {
     return content
   }
 
-  // ── Search ────────────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+  }, [])
+
   const [searchQuery,   setSearch]    = useState('')
   const [searchResults, setResults]   = useState([])
   const [searchLoading, setSearching] = useState(false)
   const debouncedQuery                = useDebounce(searchQuery, 350)
 
-  // ── Conversations (persisted via backend) ─────────────────
-  const [recentChats, setRecentChats] = useState([])  // [{user, lastMessage, unreadCount}]
-
-  // ── Active chat ───────────────────────────────────────────
-  const [selectedUser,     setSelected]      = useState(null)
-  const [messages,         setMessages]      = useState([])
-  const [loadingMsgs,      setLoadingMsgs]   = useState(false)
-  const [typingUsers,      setTypingUsers]   = useState(new Set())
   const [highlightedIndex, setHighlighted]   = useState(-1)
   const [forwardingMessage, setForwardingMessage] = useState(null)
   const [forwardUsers, setForwardUsers] = useState([])
@@ -54,9 +62,7 @@ export default function Chat() {
   const [starredOpen, setStarredOpen] = useState(false)
   const [groupsOpen, setGroupsOpen] = useState(false)
 
-  /* ─────────────────────────────────────────────────────────
-     Load conversations on mount → populates sidebar from DB
-  ───────────────────────────────────────────────────────── */
+  // ── Load Conversations ────────────────────────────────────
   useEffect(() => {
     if (!user) return
     Promise.all([getConversations(), getGroups()])
@@ -67,85 +73,50 @@ export default function Chat() {
         const hydratedDirect = await Promise.all(conversations.map(async (conv) => {
           const lastMessage = conv.lastMessage
           if (!lastMessage?.encryptedMessage) return { ...conv, isGroup: false }
-
           try {
             const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
-            const previewContent = getPreviewText(lastMessage.messageType, content)
-            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: previewContent } }
-          } catch (err) {
-            console.warn('Conversation preview decrypt failed:', err)
-            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: '[encrypted message]' } }
+            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: getPreviewText(lastMessage.messageType, content) } }
+          } catch {
+            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: '[encrypted]' } }
           }
         }))
 
-        const hydratedGroups = groups.map((group) => {
-          const chatUserShape = {
-            _id: group._id,
-            username: group.name,
-            avatarColor: '#22313a',
-            avatar: group.avatar || null,
-            isGroup: true,
-            description: group.description || '',
-            members: group.members || [],
-          }
-
-          const groupLast = group.lastMessage
-            ? {
-                ...group.lastMessage,
-                content: getPreviewText(group.lastMessage.messageType, group.lastMessage.encryptedMessage || ''),
-              }
-            : null
-
-          return {
-            user: chatUserShape,
-            lastMessage: groupLast,
-            unreadCount: group.unreadCount || 0,
-            isGroup: true,
-          }
-        })
+        const hydratedGroups = groups.map((group) => ({
+          user: { _id: group._id, username: group.name, avatarColor: '#22313a', avatar: group.avatar || null, isGroup: true, description: group.description || '', members: group.members || [] },
+          lastMessage: group.lastMessage ? { ...group.lastMessage, content: getPreviewText(group.lastMessage.messageType, group.lastMessage.encryptedMessage || '') } : null,
+          unreadCount: group.unreadCount || 0,
+          isGroup: true,
+        }))
 
         const merged = [...hydratedDirect, ...hydratedGroups].sort((a, b) => {
           const aTime = new Date(a.lastMessage?.sentAt || a.lastMessage?.createdAt || 0).getTime()
           const bTime = new Date(b.lastMessage?.sentAt || b.lastMessage?.createdAt || 0).getTime()
           return bTime - aTime
         })
-
         setRecentChats(merged)
       })
       .catch(err => console.error('Conversations error:', err))
-  }, [user])
+  }, [user, setRecentChats])
 
-  /* ─────────────────────────────────────────────────────────
-     Ensure my E2EE keypair exists and my public key is uploaded
-  ───────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!user) return
-    e2ee.ensureKeyPairAndUploadIfMissing()
-      .catch(err => console.warn('E2EE key setup failed:', err))
+    e2ee.ensureKeyPairAndUploadIfMissing().catch(console.warn)
   }, [user])
 
-  /* ─────────────────────────────────────────────────────────
-     Search users via debounced query
-  ───────────────────────────────────────────────────────── */
   useEffect(() => {
     const q = debouncedQuery.trim()
     if (!q) { setResults([]); return }
     setSearching(true)
-    setHighlighted(-1)
     searchUsers(q)
       .then(({ data }) => setResults(data.users || []))
-      .catch(err => console.error('Search error:', err))
+      .catch(console.error)
       .finally(() => setSearching(false))
   }, [debouncedQuery])
 
-  /* ─────────────────────────────────────────────────────────
-     Fetch messages when selected user changes
-  ───────────────────────────────────────────────────────── */
+  // ── Fetch Messages ───────────────────────────────────────
   useEffect(() => {
     if (!selectedUser) return
     setLoadingMsgs(true)
-    setMessages([])
-
     const fetcher = selectedUser.isGroup ? getGroupMessages(selectedUser._id) : getMessages(selectedUser._id)
     fetcher
       .then(async ({ data }) => {
@@ -153,567 +124,159 @@ export default function Chat() {
         const decrypted = selectedUser.isGroup
           ? incoming.map((msg) => ({ ...msg, content: msg.encryptedMessage }))
           : await Promise.all(incoming.map(async (msg) => {
-            if (!msg.encryptedMessage) return msg
-            try {
-              const content = await e2ee.decryptMessageObject(user._id, msg, selectedUser._id)
-              return { ...msg, content }
-            } catch (err) {
-              console.warn('Decrypt failed:', err)
-              return { ...msg, content: '[unable to decrypt]' }
-            }
-          }))
-
+              if (!msg.encryptedMessage) return msg
+              try {
+                const content = await e2ee.decryptMessageObject(user._id, msg, selectedUser._id)
+                return { ...msg, content }
+              } catch { return { ...msg, content: '[encrypted]' } }
+            }))
         setMessages(decrypted)
-        // Clear unread badge
-        setRecentChats(prev =>
-          prev.map(c =>
-            c.user._id === selectedUser._id ? { ...c, unreadCount: 0 } : c
-          )
-        )
-
-        // Notify the sender that messages in this chat were read
-        if (!selectedUser.isGroup) {
-          socket?.emit('messagesRead', { from: selectedUser._id })
-        } else {
-          socket?.emit('groupMessagesRead', { groupId: selectedUser._id })
-        }
+        updateConversation(selectedUser._id, { unreadCount: 0 })
+        if (!selectedUser.isGroup) socket?.emit('messagesRead', { from: selectedUser._id })
+        else socket?.emit('groupMessagesRead', { groupId: selectedUser._id })
       })
-      .catch(err => console.error('Messages error:', err))
+      .catch(console.error)
       .finally(() => setLoadingMsgs(false))
-  }, [selectedUser, user])
+  }, [selectedUser, user, socket, setMessages, setLoadingMsgs, updateConversation])
 
-  /* ─────────────────────────────────────────────────────────
-     Select a user to open chat
-  ───────────────────────────────────────────────────────── */
   const handleSelectUser = useCallback((u) => {
-    setSelected(u)
-    setMessages([])
-    setSearch('')
-    setResults([])
-    setHighlighted(-1)
-
-    // Ensure user appears in recentChats immediately
+    setSelectedUser(u)
+    setSearch(''); setResults([]); setHighlighted(-1)
     setRecentChats(prev => {
       if (prev.find(c => c.user._id === u._id)) return prev
       return [{ user: u, lastMessage: null, unreadCount: 0 }, ...prev]
     })
-  }, [])
+  }, [setSelectedUser, setRecentChats])
 
-    /* ─────────────────────────────────────────────────────────
-      Send message as encrypted payload
-    ───────────────────────────────────────────────────────── */
+  const showIncomingNotification = useCallback((message, { isGroup, isSelected }) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission !== 'granted') return
+    if (!document.hidden && isSelected) return
+
+    const senderName = message.sender?.username || 'New message'
+    const groupName = message.group?.name || 'Group chat'
+    const title = isGroup ? `${senderName} in ${groupName}` : senderName
+    const body = (message.content || '').toString().trim() || 'New message received'
+    const notification = new Notification(title, {
+      body,
+      icon: '/vite.svg',
+      tag: isGroup ? `group-${message.group?._id || message.group || 'chat'}` : `chat-${message.sender?._id || message.sender || 'chat'}`,
+    })
+
+    notification.onclick = () => {
+      window.focus()
+      if (isSelected) return
+      if (isGroup && message.group) {
+        handleSelectUser({
+          _id: message.group._id || message.group,
+          username: message.group.name || 'Group chat',
+          avatar: message.group.avatar || null,
+          avatarColor: '#22313a',
+          isGroup: true,
+        })
+      } else if (!isGroup && message.sender) {
+        handleSelectUser(message.sender)
+      }
+      notification.close()
+    }
+  }, [handleSelectUser])
+
   const handleSend = useCallback(async (content, messageType = 'text', metadata = {}) => {
     if (!selectedUser || !content?.toString().trim()) return
-
-    const updateRecent = (messageData, displayContent) => {
-      setRecentChats(prev => {
-        const entry   = prev.find(c => c.user._id === selectedUser._id)
-        const newLast = {
-          ...(messageData || {}),
-          content: displayContent,
-          createdAt: messageData?.createdAt || new Date().toISOString(),
-          sender: user._id,
-          messageType,
-          attachmentMeta: messageData?.attachmentMeta || metadata.attachmentMeta || null,
-          scheduledFor: messageData?.scheduledFor || metadata.scheduledFor || null,
-          scheduledStatus: messageData?.scheduledStatus || (metadata.scheduledFor ? 'scheduled' : 'sent'),
-          sentAt: messageData?.sentAt || null,
-        }
-        if (entry) {
-          return [{ ...entry, lastMessage: newLast }, ...prev.filter(c => c.user._id !== selectedUser._id)]
-        }
-        return [{ user: selectedUser, lastMessage: newLast, unreadCount: 0 }, ...prev]
-      })
-    }
+    const updateSide = (msg, text) => bumpConversation(selectedUser._id, { ...msg, content: text }, true)
 
     try {
       if (selectedUser.isGroup) {
-        if (socket) {
-          socket.emit('sendGroupMessage', {
-            groupId: selectedUser._id,
-            content,
-            messageType,
-            voiceDuration: metadata.duration || null,
-            attachmentMeta: metadata.attachmentMeta || null,
-          }, (res) => {
-            if (res?.success) {
-              const sentMessage = { ...res.message, content, messageType }
-              setMessages(prev => [...prev, sentMessage])
-              updateRecent(sentMessage, getPreviewText(messageType, content))
-            } else {
-              console.error('Group send failed:', res?.error || 'Unknown socket error')
-            }
-          })
-        } else {
-          const { data } = await sendGroupMessage(selectedUser._id, {
-            content,
-            messageType,
-            voiceDuration: metadata.duration || null,
-            attachmentMeta: metadata.attachmentMeta || null,
-          })
-          const sentMessage = { ...data.message, content, messageType }
-          setMessages(prev => [...prev, sentMessage])
-          updateRecent(sentMessage, getPreviewText(messageType, content))
-        }
+        socket?.emit('sendGroupMessage', { groupId: selectedUser._id, content, messageType, voiceDuration: metadata.duration || null, attachmentMeta: metadata.attachmentMeta || null }, (res) => {
+          if (res?.success) {
+            const msg = { ...res.message, content, messageType }
+            addMessage(msg); updateSide(msg, getPreviewText(messageType, content))
+          }
+        })
       } else {
         const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
-
-        if (socket) {
-          socket.emit('sendMessage', { 
-            to: selectedUser._id, 
-            ...payload,
-            messageType,
-            voiceDuration: metadata.duration || null,
-            scheduledFor: metadata.scheduledFor || null,
-            attachmentMeta: metadata.attachmentMeta || null,
-          }, (res) => {
-            if (res?.success) {
-              const sentMessage = { ...res.message, content, messageType }
-              setMessages(prev => [...prev, sentMessage])
-              const sidebarPreview = getPreviewText(messageType, content)
-              updateRecent(sentMessage, sidebarPreview)
-            } else {
-              console.error('Send failed:', res?.error || 'Unknown socket error')
-            }
-          })
-        } else {
-          const { data } = await sendMessage(selectedUser._id, {
-            ...payload,
-            scheduledFor: metadata.scheduledFor || null,
-            messageType,
-            voiceDuration: metadata.duration || null,
-            attachmentMeta: metadata.attachmentMeta || null,
-          })
-          const sentMessage = { ...data.message, content, messageType }
-          setMessages(prev => [...prev, sentMessage])
-          const sidebarPreview = getPreviewText(messageType, content)
-          updateRecent(sentMessage, sidebarPreview)
-        }
+        socket?.emit('sendMessage', { to: selectedUser._id, ...payload, messageType, voiceDuration: metadata.duration || null, scheduledFor: metadata.scheduledFor || null, attachmentMeta: metadata.attachmentMeta || null }, (res) => {
+          if (res?.success) {
+            const msg = { ...res.message, content, messageType }
+            addMessage(msg); updateSide(msg, getPreviewText(messageType, content))
+          }
+        })
       }
-    } catch (err) {
-      console.error('Encrypted send failed:', err)
-    }
-  }, [socket, selectedUser, user])
+    } catch (err) { console.error('Send failed:', err) }
+  }, [socket, selectedUser, user, addMessage, bumpConversation])
 
   const handleEditMessage = useCallback(async (messageId, content) => {
     if (!selectedUser || !messageId || !content?.trim()) return
-
     const payload = await e2ee.encryptForChat(user._id, selectedUser._id, content)
     const { data } = await editMessage(messageId, payload)
-
-    const editedAt = data?.message?.editedAt || new Date().toISOString()
-
-    setMessages(prev => prev.map((msg) => {
-      if (msg._id !== messageId) return msg
-      return {
-        ...msg,
-        encryptedMessage: payload.encryptedMessage,
-        iv: payload.iv,
-        encryptedKey: payload.encryptedKey,
-        content,
-        editedAt,
-      }
-    }))
-
-    setRecentChats(prev => prev.map((conv) => {
-      if (conv.lastMessage?._id !== messageId) return conv
-      return {
-        ...conv,
-        lastMessage: {
-          ...conv.lastMessage,
-          encryptedMessage: payload.encryptedMessage,
-          iv: payload.iv,
-          encryptedKey: payload.encryptedKey,
-          content,
-          editedAt,
-        },
-      }
-    }))
-  }, [selectedUser, user])
-
-  const handleMessageUpdate = useCallback((messageId, updater) => {
-    setMessages((prev) => prev.map((msg) => (msg._id === messageId ? updater(msg) : msg)))
-    setRecentChats((prev) => prev.map((conv) => {
-      if (conv.lastMessage?._id !== messageId) return conv
-      return { ...conv, lastMessage: updater(conv.lastMessage) }
-    }))
-  }, [])
-
-  const handleMessageRemove = useCallback((messageId) => {
-    setMessages((prev) => prev.filter((msg) => msg._id !== messageId))
-    setRecentChats((prev) => prev.map((conv) => {
-      if (conv.lastMessage?._id !== messageId) return conv
-      return { ...conv, lastMessage: null }
-    }))
-  }, [])
-
-  const updateConversationPreference = useCallback((userId, patch) => {
-    setRecentChats((prev) => prev.map((conv) => {
-      const convId = conv.user._id?.toString?.() || conv.user._id
-      if (convId !== userId.toString()) return conv
-      return { ...conv, ...patch }
-    }))
-  }, [])
+    updateMessage(messageId, (msg) => ({ ...msg, ...payload, content, editedAt: data?.message?.editedAt }))
+  }, [selectedUser, user, updateMessage])
 
   const handleConversationPreferenceChange = useCallback(async ({ userId, type }) => {
     if (!userId || !type) return
-
     if (type === 'star') {
       const { data } = await toggleStarConversation(userId)
-      updateConversationPreference(userId, { starred: Boolean(data?.starred) })
-      return
-    }
-
-    if (type === 'pin') {
+      updateConversation(userId, { starred: Boolean(data?.starred) })
+    } else if (type === 'pin') {
       const { data } = await togglePinConversation(userId)
-      updateConversationPreference(userId, { pinned: Boolean(data?.pinned) })
-      return
-    }
-
-    if (type === 'read') {
+      updateConversation(userId, { pinned: Boolean(data?.pinned) })
+    } else if (type === 'read') {
       await markConversationRead(userId)
-      updateConversationPreference(userId, { unreadCount: 0 })
+      updateConversation(userId, { unreadCount: 0 })
     }
-  }, [updateConversationPreference])
+  }, [updateConversation])
 
-  const beginForward = useCallback(async (message) => {
-    if (selectedUser?.isGroup) return
-    if (!message) return
-    setForwardingMessage(message)
-    try {
-      const { data } = await getUsers()
-      setForwardUsers(data.users || [])
-    } catch (err) {
-      console.error('Failed to load forward recipients:', err)
-      setForwardUsers([])
-    }
-  }, [selectedUser])
-
-  const cancelForward = useCallback(() => {
-    setForwardingMessage(null)
-  }, [])
-
-  const openScheduledMessages = useCallback(() => {
-    if (!selectedUser) return
-    setGroupsOpen(false)
-    setScheduledOpen(true)
-  }, [selectedUser])
-
-  const openStarredMessages = useCallback(() => {
-    setGroupsOpen(false)
-    setStarredOpen(true)
-  }, [])
-
-  const openGroupManager = useCallback(() => {
-    setStarredOpen(false)
-    setScheduledOpen(false)
-    setGroupsOpen(true)
-  }, [])
-
-  const handleForwardRecipientSelect = useCallback(async (recipient, message) => {
-    if (!recipient || !message) return
-
-    const payload = await e2ee.encryptForChat(user._id, recipient._id, message.content)
-    await forwardMessage(message._id, { to: recipient._id, ...payload })
-
-    const previewContent = getPreviewText(message.messageType, message.content)
-    setRecentChats((prev) => {
-      const entry = prev.find((conv) => conv.user._id === recipient._id)
-      const newLast = {
-        _id: message._id,
-        content: previewContent,
-        createdAt: new Date().toISOString(),
-        sender: user._id,
-        messageType: message.messageType,
-        attachmentMeta: message.attachmentMeta || null,
-        sentAt: new Date().toISOString(),
-      }
-      if (entry) {
-        return [{ ...entry, lastMessage: newLast }, ...prev.filter((conv) => conv.user._id !== recipient._id)]
-      }
-      return [{ user: recipient, lastMessage: newLast, unreadCount: 0 }, ...prev]
-    })
-
-    setForwardingMessage(null)
-  }, [user])
-
-  /* ─────────────────────────────────────────────────────────
-     Socket events — incoming messages, typing indicators
-  ───────────────────────────────────────────────────────── */
+  // ── Socket Events ────────────────────────────────────────
   useEffect(() => {
     if (!socket) return
 
     const handleNewMessage = async (msg) => {
       const senderId = (msg.sender?._id || msg.sender)?.toString?.()
-      const isGroupMessage = Boolean(msg.group)
-      const activeGroup = selectedUser?.isGroup ? selectedUser._id?.toString?.() : null
-      const isSelected = isGroupMessage
-        ? activeGroup && msg.group.toString() === activeGroup
-        : selectedUser && senderId === selectedUser._id.toString()
+      const isGroup = Boolean(msg.group)
+      const targetId = isGroup ? msg.group.toString() : senderId
+      if (isGroup && senderId === user?._id?.toString?.()) return
+      const isSelected = isGroup ? selectedUser?._id === targetId : selectedUser?._id === senderId
 
       let displayMsg = msg
-      if (isGroupMessage) {
-        displayMsg = { ...msg, content: msg.encryptedMessage }
-      } else if (msg.encryptedMessage) {
-        try {
-          const content = await e2ee.decryptMessageObject(user._id, msg, senderId)
-          displayMsg = { ...msg, content }
-        } catch {
-          displayMsg = { ...msg, content: '[unable to decrypt]' }
-        }
+      if (isGroup) displayMsg = { ...msg, content: msg.encryptedMessage }
+      else if (msg.encryptedMessage) {
+        try { displayMsg = { ...msg, content: await e2ee.decryptMessageObject(user._id, msg, senderId) } }
+        catch { displayMsg = { ...msg, content: '[encrypted]' } }
       }
 
-      if (isSelected) setMessages(prev => [...prev, displayMsg])
-
-      // Update sidebar — bump unread count if chat not open
-      setRecentChats(prev => {
-        const targetId = isGroupMessage ? msg.group.toString() : senderId
-        const exists = prev.find(c => c.user._id.toString() === targetId)
-        
-        // Determine preview text based on message type
-        const sidebarPreview = getPreviewText(msg.messageType, displayMsg.content)
-        
-        const newLast = {
-          content:   sidebarPreview,
-          createdAt: msg.createdAt,
-          sender:    msg.sender?._id || msg.sender,
-          messageType: msg.messageType,
-        }
-        if (exists) {
-          return [
-            {
-              ...exists,
-              lastMessage: newLast,
-              unreadCount: isSelected || isGroupMessage ? (exists.unreadCount || 0) : (exists.unreadCount || 0) + 1,
-            },
-            ...prev.filter(c => c.user._id.toString() !== targetId),
-          ]
-        }
-        return prev   // new sender — will appear after next conversations load
-      })
+      if (isSelected) addMessage(displayMsg)
+      bumpConversation(targetId, { ...displayMsg, content: getPreviewText(msg.messageType, displayMsg.content) }, isSelected)
+      showIncomingNotification(
+        { ...displayMsg, content: getPreviewText(msg.messageType, displayMsg.content) },
+        { isGroup, isSelected }
+      )
     }
 
-    const handleMessageStatusUpdated = ({ messageId, senderId, receiverId, deliveredAt, readAt, read, scheduledStatus, sentAt, scheduledFor }) => {
-      if (!messageId) return
-
-      setMessages(prev => prev.map((msg) => {
-        if (msg._id !== messageId) return msg
-        return {
-          ...msg,
-          deliveredAt: deliveredAt || msg.deliveredAt || null,
-          readAt: readAt || msg.readAt || null,
-          read: typeof read === 'boolean' ? read : (msg.read || !!readAt),
-          scheduledStatus: scheduledStatus || msg.scheduledStatus || 'sent',
-          sentAt: sentAt || msg.sentAt || null,
-          scheduledFor: scheduledFor || msg.scheduledFor || null,
-        }
-      }))
-
-      setRecentChats(prev => prev.map((conv) => {
-        const convUserId = conv.user._id?.toString?.() || conv.user._id
-        const statusUserId = (receiverId || senderId || '').toString()
-        const lastMessageId = conv.lastMessage?._id?.toString?.() || conv.lastMessage?.id
-        const statusMessageId = messageId.toString()
-
-        if (convUserId !== statusUserId || (lastMessageId && lastMessageId !== statusMessageId)) return conv
-
-        return {
-          ...conv,
-          lastMessage: {
-            ...conv.lastMessage,
-            deliveredAt: deliveredAt || conv.lastMessage?.deliveredAt || null,
-            readAt: readAt || conv.lastMessage?.readAt || null,
-            read: typeof read === 'boolean' ? read : (conv.lastMessage?.read || !!readAt),
-            scheduledStatus: scheduledStatus || conv.lastMessage?.scheduledStatus || 'sent',
-            sentAt: sentAt || conv.lastMessage?.sentAt || null,
-            scheduledFor: scheduledFor || conv.lastMessage?.scheduledFor || null,
-          },
-        }
-      }))
-    }
-
-    const handleTyping     = ({ from }) =>
-      setTypingUsers(prev => new Set([...prev, from]))
-    const handleStopTyping = ({ from }) =>
-      setTypingUsers(prev => { const n = new Set(prev); n.delete(from); return n })
-
-    const handleMessageEdited = async ({ messageId, encryptedMessage, iv, encryptedKey, editedAt }) => {
-      if (!messageId) return
-
-      // Decrypt the edited content
-      let editedContent = '[edited message]'
+    socket.on('newMessage', handleNewMessage)
+    socket.on('messageStatusUpdated', updateMessageStatus)
+    socket.on('messageEdited', async (data) => {
       try {
-        const decrypted = await e2ee.decryptMessageObject(user._id, { encryptedMessage, iv, encryptedKey }, selectedUser._id)
-        editedContent = decrypted
-      } catch (err) {
-        console.warn('Failed to decrypt edited message:', err)
-      }
-
-      // Update messages list
-      setMessages(prev => prev.map(msg => {
-        if (msg._id !== messageId) return msg
-        return {
-          ...msg,
-          encryptedMessage,
-          iv,
-          encryptedKey,
-          content: editedContent,
-          editedAt,
-        }
-      }))
-
-      // Update recent chats if it's the last message
-      setRecentChats(prev => prev.map(conv => {
-        if (conv.lastMessage?._id !== messageId) return conv
-        return {
-          ...conv,
-          lastMessage: {
-            ...conv.lastMessage,
-            encryptedMessage,
-            iv,
-            encryptedKey,
-            content: editedContent,
-            editedAt,
-          },
-        }
-      }))
-    }
-
-    const handleMessagePinned = ({ messageId, pinned }) => {
-      if (!messageId) return
-      setMessages(prev => prev.map((msg) => (
-        msg._id === messageId ? { ...msg, pinnedBy: pinned ? [user._id] : [] } : msg
-      )))
-    }
-
-    const handleMessageStarred = ({ messageId, starred }) => {
-      if (!messageId) return
-      setMessages(prev => prev.map((msg) => (
-        msg._id === messageId ? { ...msg, starredBy: starred ? [user._id] : [] } : msg
-      )))
-    }
-
-    const handleMessageDeleted = ({ messageId, deletedForEveryone, actorId }) => {
-      if (!messageId) return
-
-      setMessages(prev => prev.filter((msg) => msg._id !== messageId))
-
-      setRecentChats(prev => prev.map((conv) => {
-        if (conv.lastMessage?._id !== messageId) return conv
-        if (deletedForEveryone) {
-          return { ...conv, lastMessage: null }
-        }
-        if (actorId && actorId.toString() === user._id.toString()) {
-          return { ...conv, lastMessage: null }
-        }
-        return conv
-      }))
-    }
-
-    const handleGroupMessageSeen = ({ groupId, userId, seenAt, messageIds = [] }) => {
-      if (!groupId || !userId) return
-
-      const seenEntry = {
-        user: {
-          _id: userId,
-          username: userId === user?._id ? user?.username : userId,
-        },
-        seenAt,
-      }
-
-      setMessages((prev) => prev.map((msg) => {
-        const msgGroupId = msg.group?._id?.toString?.() || msg.group?.toString?.() || msg.group
-        const msgId = msg._id?.toString?.() || msg._id
-        if (msgGroupId !== groupId.toString()) return msg
-        if (messageIds.length && !messageIds.map((id) => id.toString()).includes(msgId)) return msg
-
-        const existingSeenBy = Array.isArray(msg.seenBy) ? msg.seenBy : []
-        const hasSeenUser = existingSeenBy.some((entry) => (entry?.user?._id?.toString?.() || entry?.user?.toString?.()) === userId.toString())
-        if (hasSeenUser) return msg
-
-        return {
-          ...msg,
-          seenBy: [...existingSeenBy, seenEntry],
-        }
-      }))
-
-      setRecentChats((prev) => prev.map((conv) => {
-        if (conv.user._id?.toString?.() !== groupId.toString()) return conv
-        if (conv.lastMessage?._id && messageIds.length && !messageIds.map((id) => id.toString()).includes(conv.lastMessage._id.toString())) return conv
-
-        const existingSeenBy = Array.isArray(conv.lastMessage?.seenBy) ? conv.lastMessage.seenBy : []
-        const hasSeenUser = existingSeenBy.some((entry) => (entry?.user?._id?.toString?.() || entry?.user?.toString?.()) === userId.toString())
-        if (hasSeenUser) return conv
-
-        return {
-          ...conv,
-          lastMessage: conv.lastMessage
-            ? { ...conv.lastMessage, seenBy: [...existingSeenBy, seenEntry] }
-            : conv.lastMessage,
-        }
-      }))
-    }
-
-    socket.on('newMessage',        handleNewMessage)
-    socket.on('userTyping',        handleTyping)
-    socket.on('userStoppedTyping', handleStopTyping)
-    socket.on('messageStatusUpdated', handleMessageStatusUpdated)
-    socket.on('messageEdited', handleMessageEdited)
-    socket.on('messagePinned', handleMessagePinned)
-    socket.on('messageStarred', handleMessageStarred)
-    socket.on('messageDeleted', handleMessageDeleted)
-    socket.on('groupMessageSeen', handleGroupMessageSeen)
+        const content = await e2ee.decryptMessageObject(user._id, data, selectedUser?._id)
+        updateMessage(data.messageId, m => ({ ...m, ...data, content }))
+      } catch { updateMessage(data.messageId, m => ({ ...m, ...data, content: '[edited]' })) }
+    })
+    socket.on('messagePinned', ({ messageId, pinned }) => updateMessage(messageId, m => ({ ...m, pinnedBy: pinned ? [user._id] : [] })))
+    socket.on('messageStarred', ({ messageId, starred }) => updateMessage(messageId, m => ({ ...m, starredBy: starred ? [user._id] : [] })))
+    socket.on('messageDeleted', ({ messageId }) => removeMessage(messageId))
 
     return () => {
-      socket.off('newMessage',        handleNewMessage)
-      socket.off('userTyping',        handleTyping)
-      socket.off('userStoppedTyping', handleStopTyping)
-      socket.off('messageStatusUpdated', handleMessageStatusUpdated)
-      socket.off('messageEdited', handleMessageEdited)
-      socket.off('messagePinned', handleMessagePinned)
-      socket.off('messageStarred', handleMessageStarred)
-      socket.off('messageDeleted', handleMessageDeleted)
-      socket.off('groupMessageSeen', handleGroupMessageSeen)
+      socket.off('newMessage')
+      socket.off('messageStatusUpdated')
+      socket.off('messageEdited')
+      socket.off('messagePinned')
+      socket.off('messageStarred')
+      socket.off('messageDeleted')
     }
-  }, [socket, selectedUser, user])
+  }, [socket, selectedUser, user, addMessage, bumpConversation, updateMessageStatus, updateMessage, removeMessage, showIncomingNotification])
 
-  /* ─────────────────────────────────────────────────────────
-     Keyboard navigation — ↑↓ list, Enter open, Esc close
-  ───────────────────────────────────────────────────────── */
   const isSearchMode = debouncedQuery.trim().length > 0
-  const displayList  = isSearchMode
-    ? searchResults.map(u => ({ user: u, lastMessage: null, unreadCount: 0 }))
-    : recentChats
+  const displayList  = isSearchMode ? searchResults.map(u => ({ user: u, lastMessage: null, unreadCount: 0 })) : recentChats
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape' && selectedUser) {
-        setSelected(null); return
-      }
-      const tag = e.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
-
-      const len = displayList.length
-      if (!len) return
-
-      if (e.key === 'ArrowDown')  { e.preventDefault(); setHighlighted(i => (i + 1) % len) }
-      if (e.key === 'ArrowUp')    { e.preventDefault(); setHighlighted(i => (i <= 0 ? len - 1 : i - 1)) }
-      if (e.key === 'Enter' && highlightedIndex >= 0) {
-        e.preventDefault()
-        handleSelectUser(displayList[highlightedIndex].user)
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault()
-        document.querySelector('.search-input')?.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selectedUser, highlightedIndex, displayList, handleSelectUser])
-
-  /* ─────────────────────────────────────────────────────────
-     Render
-  ───────────────────────────────────────────────────────── */
   return (
     <div className={`chat-page ${selectedUser ? 'chat-open' : ''}`}>
       <Sidebar
@@ -723,9 +286,9 @@ export default function Chat() {
         onSelectUser={handleSelectUser}
         onConversationPreferenceChange={handleConversationPreferenceChange}
         onLogout={logout}
-        onOpenStarred={openStarredMessages}
-        onOpenScheduled={openScheduledMessages}
-        onOpenGroups={openGroupManager}
+        onOpenStarred={() => setStarredOpen(true)}
+        onOpenScheduled={() => setScheduledOpen(true)}
+        onOpenGroups={() => setGroupsOpen(true)}
         isOnline={isOnline}
         searchQuery={searchQuery}
         onSearch={setSearch}
@@ -741,37 +304,30 @@ export default function Chat() {
         onSend={handleSend}
         onEditMessage={handleEditMessage}
         isOnline={isOnline}
-        isTyping={selectedUser ? typingUsers.has(selectedUser._id) : false}
-        onBack={() => setSelected(null)}
+        onBack={() => setSelectedUser(null)}
         forwardingMessage={forwardingMessage}
         forwardUsers={forwardUsers}
-        onForwardRecipientSelect={handleForwardRecipientSelect}
-        onCancelForward={cancelForward}
-        onForwardRequest={beginForward}
-        onMessageUpdate={handleMessageUpdate}
-        onMessageRemove={handleMessageRemove}
-        onCreateGroup={openGroupManager}
+        onForwardRecipientSelect={async (recipient, message) => {
+          const payload = await e2ee.encryptForChat(user._id, recipient._id, message.content)
+          await forwardMessage(message._id, { to: recipient._id, ...payload })
+          bumpConversation(recipient._id, { ...message, content: getPreviewText(message.messageType, message.content) })
+          setForwardingMessage(null)
+        }}
+        onCancelForward={() => setForwardingMessage(null)}
+        onForwardRequest={async (msg) => {
+          setForwardingMessage(msg)
+          getUsers().then(res => setForwardUsers(res.data.users || []))
+        }}
+        onMessageUpdate={updateMessage}
+        onMessageRemove={removeMessage}
+        onCreateGroup={() => setGroupsOpen(true)}
         scheduledOpen={scheduledOpen}
-        onOpenScheduled={openScheduledMessages}
+        onOpenScheduled={() => setScheduledOpen(true)}
         onCloseScheduled={() => setScheduledOpen(false)}
       />
-      <StarredMessages
-        open={starredOpen}
-        onClose={() => setStarredOpen(false)}
-        currentUser={user}
-        onOpenChat={handleSelectUser}
-      />
-      <GroupManager
-        open={groupsOpen}
-        onClose={() => setGroupsOpen(false)}
-        currentUser={user}
-      />
-      <ScheduledList
-        open={scheduledOpen && Boolean(selectedUser)}
-        onClose={() => setScheduledOpen(false)}
-        userId={selectedUser?._id}
-        onCancelled={() => setScheduledOpen(false)}
-      />
+      <StarredMessages open={starredOpen} onClose={() => setStarredOpen(false)} currentUser={user} onOpenChat={handleSelectUser} />
+      <GroupManager open={groupsOpen} onClose={() => setGroupsOpen(false)} currentUser={user} />
+      <ScheduledList open={scheduledOpen && !!selectedUser} onClose={() => setScheduledOpen(false)} userId={selectedUser?._id} onCancelled={() => setScheduledOpen(false)} />
     </div>
   )
 }
