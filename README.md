@@ -48,45 +48,77 @@ Developed a flexible authentication layer that supports multiple identity provid
 
 ## 🔑 Configuration & Environment Variables
 
-### **Backend Setup (`backend/.env`)**
-Create a `.env` file in the `backend` folder. **Crucial:** Ensure the `FIREBASE_PRIVATE_KEY` is wrapped in quotes and contains actual line breaks (`\n`).
+## 🛠️ Getting Started
 
-| Variable | Requirement | Description |
-| :--- | :--- | :--- |
-| `PORT` | Optional | Port for the server (default: 5000). |
-| `MONGODB_URI` | **Required** | Your MongoDB connection string. |
-| `JWT_SECRET` | **Required** | Random string for token signing. |
-| `EMAIL_USER` | Optional | Gmail address for OTPs. |
+### **1. Create the Firebase project**
+1. Open the [Firebase Console](https://console.firebase.google.com/).
+2. Click **Add project** and create a new project.
+3. In **Project Settings**, register a **Web App**.
+4. Copy the Web App config values: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, and `VITE_FIREBASE_APP_ID`.
+
+### **2. Generate the Firebase service account key**
+1. In the same Firebase project, open **Service Accounts**.
+2. Click **Generate new private key**.
+3. Download the JSON file.
+4. From that file, use these backend values: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
+5. Keep `FIREBASE_PRIVATE_KEY` inside quotes and preserve the `\n` line breaks.
+
+### **3. Create the MongoDB database**
+1. Open [MongoDB Atlas](https://www.mongodb.com/atlas) or your local MongoDB server.
+2. Create a cluster or start your local database.
+3. Copy the connection string for `MONGODB_URI`.
+4. If you use Atlas, make sure your IP address is allowed in the network access list.
+
+### **4. Create a JWT secret**
+1. Generate a random secret string for `JWT_SECRET`.
+2. Use a long, hard-to-guess value.
+3. Store the same secret in `backend/.env`.
+
+### **5. Set the email address for OTPs**
+1. Choose the Gmail address that will send OTP emails.
+2. Put it in `EMAIL_USER`.
+3. Make sure the Gmail app password or SMTP setup is configured in your backend email service if needed.
+
+### **6. Set the backend URL for the frontend**
+1. If you are running locally, use `http://localhost:5000` for `VITE_API_URL`.
+2. If you deployed the backend on Render, use your Render backend URL.
+3. This value is required so the frontend can reach the API and Socket.IO server.
+
+### **7. Create `backend/.env`**
+Create a `.env` file inside the `backend/` folder and add these variables:
+
+| Variable | Description |
+| :--- | :--- |
+| `PORT` | Server port, usually `5000` |
+| `MONGODB_URI` | MongoDB connection string |
+| `JWT_SECRET` | Random secret string for signing tokens |
+| `EMAIL_USER` | Gmail address used for OTP emails |
+| `FIREBASE_PROJECT_ID` | Firebase project ID from the service account JSON |
+| `FIREBASE_CLIENT_EMAIL` | Firebase client email from the service account JSON |
+| `FIREBASE_PRIVATE_KEY` | Firebase private key from the service account JSON, wrapped in quotes and using `\n` line breaks |
+
+### **8. Create `frontend/.env`**
+Create a `.env` file inside the `frontend/` folder and add these variables:
+
+| Variable | Description |
+| :--- | :--- |
+| `VITE_API_URL` | Backend URL, for example `http://localhost:5000` or your Render URL |
+| `VITE_FIREBASE_API_KEY` | Firebase Web API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | Firebase project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
+| `VITE_FIREBASE_APP_ID` | Firebase app ID |
+| `VITE_FIREBASE_VAPID_KEY` | Firebase Cloud Messaging VAPID key |
+
+### **9. Check your values**
+1. Make sure the backend and frontend `.env` files are saved in the correct folders.
+2. Confirm `VITE_API_URL` points to the deployed backend when you publish the app.
+3. Confirm `FIREBASE_PRIVATE_KEY` keeps the `\n` characters and remains inside quotes.
+
 ---
 
 ## 🛠️ Getting Started
-
-### **1. Environment Variables Setup**
-Create a `.env` file in both the `backend/` and `frontend/` directories.
-
-#### **Backend (`backend/.env`)**
-| Key | Description |
-| :--- | :--- |
-| `PORT` | Server port (default: 5000) |
-| `MONGODB_URI` | MongoDB connection string (Local or Atlas) |
-| `JWT_SECRET` | Secure string for signing JWT tokens |
-| `FIREBASE_PROJECT_ID` | From Firebase Service Account JSON |
-| `FIREBASE_CLIENT_EMAIL` | From Firebase Service Account JSON |
-| `FIREBASE_PRIVATE_KEY` | From Firebase Service Account JSON (handle `\n`) |
-
-#### **Frontend (`frontend/.env`)**
-| Key | Description |
-| :--- | :--- |
-| `VITE_API_URL` | Backend URL (e.g., http://localhost:5000) |
-| `VITE_FIREBASE_API_KEY` | Firebase Web API Key |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Auth Domain |
-| `VITE_FIREBASE_PROJECT_ID` | Firebase Project ID |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase Storage Bucket |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
-| `VITE_FIREBASE_APP_ID` | Firebase App ID |
-| `VITE_FIREBASE_VAPID_KEY` | Generated in Firebase Console > Cloud Messaging |
-
----
 
 ### **2. Installation & Running (Local)**
 
