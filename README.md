@@ -57,39 +57,80 @@ Create a `.env` file in the `backend` folder. **Crucial:** Ensure the `FIREBASE_
 | `MONGODB_URI` | **Required** | Your MongoDB connection string. |
 | `JWT_SECRET` | **Required** | Random string for token signing. |
 | `EMAIL_USER` | Optional | Gmail address for OTPs. |
-| `EMAIL_PASS` | Optional | Gmail App Password. |
-| `FIREBASE_PROJECT_ID` | **Required** | From Firebase Service Account JSON. |
-| `FIREBASE_PRIVATE_KEY` | **Required** | Must include `\n` characters. |
+---
 
-### **Frontend Setup (`frontend/.env`)**
-Create a `.env` file in the `frontend` folder.
+## 🛠️ Getting Started
 
-| Variable | Description |
+### **1. Environment Variables Setup**
+Create a `.env` file in both the `backend/` and `frontend/` directories.
+
+#### **Backend (`backend/.env`)**
+| Key | Description |
 | :--- | :--- |
-| `VITE_API_URL` | `http://localhost:5000` (or your backend URL). |
-| `VITE_FIREBASE_*` | Standard Web SDK keys from Firebase Console. |
+| `PORT` | Server port (default: 5000) |
+| `MONGODB_URI` | MongoDB connection string (Local or Atlas) |
+| `JWT_SECRET` | Secure string for signing JWT tokens |
+| `FIREBASE_PROJECT_ID` | From Firebase Service Account JSON |
+| `FIREBASE_CLIENT_EMAIL` | From Firebase Service Account JSON |
+| `FIREBASE_PRIVATE_KEY` | From Firebase Service Account JSON (handle `\n`) |
+
+#### **Frontend (`frontend/.env`)**
+| Key | Description |
+| :--- | :--- |
+| `VITE_API_URL` | Backend URL (e.g., http://localhost:5000) |
+| `VITE_FIREBASE_API_KEY` | Firebase Web API Key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Auth Domain |
+| `VITE_FIREBASE_PROJECT_ID` | Firebase Project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase Storage Bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
+| `VITE_FIREBASE_APP_ID` | Firebase App ID |
+| `VITE_FIREBASE_VAPID_KEY` | Generated in Firebase Console > Cloud Messaging |
 
 ---
 
-## 🗄️ Database & Firebase Setup
+### **2. Installation & Running (Local)**
 
-### **1. MongoDB Setup**
-- **Cloud (Atlas)**: Create a cluster at [MongoDB Atlas](https://www.mongodb.com/). Whitelist `0.0.0.0/0` in Network Access for testing.
-- **Local**: Install [MongoDB Community Server](https://www.mongodb.com/try/download/community) and ensure it's running on port `27017`.
+**Backend:**
+```bash
+cd backend && npm install && npm start
+```
 
-### **2. Firebase Service Account (Backend)**
-To enable Google Login and token verification:
-1. Go to **Firebase Console** > **Project Settings** > **Service Accounts**.
-2. Click **Generate New Private Key**.
-3. Copy the values from the JSON into your backend `.env`.
-
-### **3. Firebase Web Config (Frontend)**
-1. Go to **Firebase Console** > **Project Settings** > **General**.
-2. Add a new "Web App" and copy the `firebaseConfig` object into your frontend `.env`.
+**Frontend:**
+```bash
+cd frontend && npm install && npm run dev
+```
 
 ---
 
-## 🐳 Docker Deployment (Recommended)
+## 🚀 Super Simple 5-Minute Setup
+
+If you want to run this project **right now** without typing many commands, follow these simple steps:
+
+### **Step 1: Copy the Secret Files**
+Go into the `backend` folder and the `frontend` folder. Look for files named `.env.example`. 
+- **Rename them** to just `.env`. (Remove the `.example` part).
+
+### **Step 2: Get your Magic Keys (Firebase)**
+1. Go to the [Firebase Console](https://console.firebase.google.com/).
+2. Create a new project called "My WhatsApp".
+3. Click the **Gear icon ⚙️** > **Project Settings**.
+4. **For the Frontend**: Copy the "Web App" config keys into `frontend/.env`.
+5. **For the Backend**: Click **Service Accounts** > **Generate New Private Key**. Open that file and copy the values into `backend/.env`.
+
+### **Step 3: The One-Click Start**
+Make sure you have **Docker Desktop** open. Now, open your terminal in the main folder and type:
+```bash
+docker-compose up --build
+```
+*Wait for a few minutes while the computer builds the app...* ☕
+
+### **Step 4: Open the App!**
+Once the terminal stops moving, open your browser and go to:
+👉 **http://localhost**
+
+---
+
+## 🛠️ Advanced Setup (Manual)
 
 The easiest way to run the entire stack (Frontend, Backend, and MongoDB) is using Docker Compose.
 
@@ -127,10 +168,23 @@ The easiest way to run the entire stack (Frontend, Backend, and MongoDB) is usin
 
 ---
 
+## 🛡️ Architecture & Security
+
+### **12-Factor App Compliance**
+> "I purposely did not bake the backend environment variables into the Docker image to follow the **12-Factor App security principles**. Instead, I provided a `docker-compose.prod.yml` that allows the user to inject their own secrets safely at runtime."
+
+### **Key Technical Decisions**
+- **State Management**: Implemented **Zustand** for atomic state updates, significantly reducing re-renders compared to standard React Context.
+- **Service Workers**: Used **Firebase Cloud Messaging (FCM)** with a background Service Worker to ensure real-time push notifications even when the browser tab is closed.
+- **E2EE**: End-to-End Encryption is handled client-side; the server only stores encrypted blobs and public keys.
+- **Containerization**: Multi-stage Docker builds ensure that the production frontend is served via a hardened Nginx instance, while the backend remains isolated.
+
+---
+
 ## 📸 Project Showcase
 
 > [!TIP]
-> **To the Interviewer:** This project features a custom-built Glassmorphism UI. Key visual highlights include:
+> This project features a custom-built Glassmorphism UI. Key visual highlights include:
 > - **Real-time Chat Interface**: Transparent message bubbles with backdrop-blur effects.
 > - **Dynamic Sidebars**: Smooth transitions between chats and group management.
 > - **Authentication UI**: Intuitive multi-path login screens with animated transitions.

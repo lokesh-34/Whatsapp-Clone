@@ -21,7 +21,10 @@ const useChatStore = create((set, get) => ({
 
   setLoadingMsgs: (loading) => set({ loadingMsgs: loading }),
 
-  setRecentChats: (chats) => set({ recentChats: chats }),
+  setRecentChats: (chats) => set((state) => {
+    const nextChats = typeof chats === 'function' ? chats(state.recentChats) : chats;
+    return { recentChats: Array.isArray(nextChats) ? nextChats : [] };
+  }),
 
   // ── Real-time Status Updates ───────────────────────────────
   updateMessageStatus: ({ messageIds, deliveredAt, readAt, read, scheduledStatus, sentAt, scheduledFor }) => {
@@ -82,17 +85,20 @@ const useChatStore = create((set, get) => ({
   })),
 
   updateConversation: (userId, patch) => set((state) => ({
-    recentChats: state.recentChats.map((conv) => {
-      const convId = conv.user._id?.toString() || conv.user._id
-      if (convId !== userId.toString()) return conv
-      return { ...conv, ...patch }
-    })
+    recentChats: Array.isArray(state.recentChats) 
+      ? state.recentChats.map((conv) => {
+          const convId = conv.user?._id?.toString() || conv.user?._id
+          if (convId !== userId.toString()) return conv
+          return { ...conv, ...patch }
+        })
+      : []
   })),
 
   // Bump a conversation to the top with a new message
   bumpConversation: (userId, lastMessage, isSelected = false) => set((state) => {
     const targetId = userId.toString()
-    const entry = state.recentChats.find(c => c.user._id.toString() === targetId)
+    const chats = Array.isArray(state.recentChats) ? state.recentChats : []
+    const entry = chats.find(c => (c.user?._id || c.user)?.toString() === targetId)
     
     const updatedEntry = entry 
       ? { 
@@ -100,9 +106,9 @@ const useChatStore = create((set, get) => ({
           lastMessage, 
           unreadCount: isSelected ? 0 : (entry.unreadCount || 0) + (lastMessage.sender === userId ? 1 : 0) 
         }
-      : { user: { _id: userId }, lastMessage, unreadCount: 1 } // Fallback for new chats
+      : { user: { _id: userId }, lastMessage, unreadCount: 1 }
 
-    const filtered = state.recentChats.filter(c => c.user._id.toString() !== targetId)
+    const filtered = chats.filter(c => (c.user?._id || c.user)?.toString() !== targetId)
     return { recentChats: [updatedEntry, ...filtered] }
   })
 }))

@@ -575,27 +575,6 @@ export default function Sidebar({
             {filter.label}
           </motion.button>
         ))}
-        <motion.button
-          type="button"
-          style={{
-            padding: '6px 12px',
-            borderRadius: '20px',
-            border: 'none',
-            background: 'transparent',
-            color: '#8696A0',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            marginLeft: 'auto',
-          }}
-          whileHover={{ color: '#E9EDEF' }}
-          whileTap={{ scale: 0.95 }}
-        >
-          ▼
-        </motion.button>
       </div>
 
       {/* Section label */}
