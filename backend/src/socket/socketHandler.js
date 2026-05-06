@@ -12,6 +12,7 @@ const getOnlineUserIds = ()      => Array.from(onlineUsers.keys())
 
 const emitMessageStatus = (io, message) => {
   const payload = {
+    messageIds: [message._id],
     messageId: message._id,
     senderId: message.sender?._id || message.sender,
     receiverId: message.receiver?._id || message.receiver,

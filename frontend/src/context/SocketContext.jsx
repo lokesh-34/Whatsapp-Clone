@@ -21,6 +21,10 @@ export const SocketProvider = ({ children }) => {
   const [onlineUsers, setOnline]  = useState([])
   const socketRef                 = useRef(null)
 
+  const socketBaseUrl =
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin)
+
   useEffect(() => {
     if (!token || !user) {
       // Disconnect if no user
@@ -33,7 +37,7 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Connect socket with JWT auth
-    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+    const newSocket = io(socketBaseUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })

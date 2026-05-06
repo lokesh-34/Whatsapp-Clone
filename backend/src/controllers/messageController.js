@@ -551,6 +551,7 @@ const forwardMessage = async (req, res, next) => {
         const messageObj = forwardedMessage.toObject()
         io.to(to).emit('newMessage', messageObj)
         io.to(to).emit('messageStatusUpdated', {
+          messageIds: [forwardedMessage._id],
           messageId: forwardedMessage._id,
           senderId: forwardedMessage.sender._id,
           receiverId: forwardedMessage.receiver._id,

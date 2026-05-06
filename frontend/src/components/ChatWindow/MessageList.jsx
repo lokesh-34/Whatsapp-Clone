@@ -4,7 +4,16 @@ import { ChevronLeft, ChevronRight, Download, Save, Share2, X, Plus, Minus, Pin,
 import MessageBubble from '../MessageBubble'
 import { deleteMessage, togglePinMessage, toggleStarMessage } from '../../api'
 
-export default function MessageList({ messages, currentUser, loading, onEditRequest, onForwardRequest, onMessageUpdate, onMessageRemove }) {
+const isLikelyMediaUrl = (value) => {
+  if (!value) return false
+  const v = value.toString().trim()
+  if (!v) return false
+  if (v === '[encrypted]') return false
+  return /^(https?:\/\/|blob:|data:|\/)/i.test(v)
+}
+
+export default function MessageList({ activeChatId, initialScrollMessageId, messages, currentUser, loading, onEditRequest, onForwardRequest, onMessageUpdate, onMessageRemove }) {
+  const listRef = useRef(null)
   const bottomRef = useRef(null)
   const currentUserId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
   const [viewerIndex, setViewerIndex] = useState(-1)
@@ -14,12 +23,101 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   const [menuState, setMenuState] = useState({ open: false, x: 0, y: 0, message: null })
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
 
-  const mediaMessages = useMemo(() => messages.filter((msg) => ['photo', 'camera', 'video'].includes(msg.messageType)), [messages])
+  const mediaMessages = useMemo(
+    () => messages.filter((msg) => ['photo', 'camera', 'video'].includes(msg.messageType) && isLikelyMediaUrl(msg.content)),
+    [messages]
+  )
   const activeMedia = viewerIndex >= 0 ? mediaMessages[viewerIndex] : null
 
+  const isInitialLoad = useRef(true)
+  const prevMsgCount = useRef(0)
+
+  const scrollToBottom = (behavior = 'auto') => {
+    const listEl = listRef.current
+    if (listEl) {
+      try {
+        listEl.scrollTo({ top: listEl.scrollHeight, behavior })
+      } catch {
+        listEl.scrollTop = listEl.scrollHeight
+      }
+    }
+    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+  }
+
+  const scrollToMessage = (messageId, behavior = 'auto') => {
+    if (!messageId) return false
+    const listEl = listRef.current
+    if (!listEl) return false
+    const target = listEl.querySelector(`[data-message-id="${messageId}"]`)
+    if (!target) return false
+
+    try {
+      target.scrollIntoView({ behavior, block: 'center' })
+    } catch {
+      // Fallback: try snapping list roughly by offset
+      listEl.scrollTop = Math.max(0, target.offsetTop - 80)
+    }
+    return true
+  }
+
+  // When switching chats, always reset and snap to bottom once messages arrive.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    isInitialLoad.current = true
+    prevMsgCount.current = 0
+    setViewerIndex(-1)
+
+    const doInitialScroll = () => {
+      if (initialScrollMessageId) {
+        const ok = scrollToMessage(initialScrollMessageId, 'auto')
+        if (ok) return
+      }
+      scrollToBottom('auto')
+    }
+
+    // In case we already have some messages (fast cache), snap immediately.
+    // Also retry shortly after to handle layout/animation settling.
+    const rafId = requestAnimationFrame(doInitialScroll)
+    const t1 = setTimeout(doInitialScroll, 60)
+    const t2 = setTimeout(doInitialScroll, 220)
+    return () => {
+      cancelAnimationFrame(rafId)
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [activeChatId, initialScrollMessageId])
+
+  useEffect(() => {
+    if (loading) return
+
+    const nextCount = messages.length
+    const prevCount = prevMsgCount.current
+    prevMsgCount.current = nextCount
+
+    if (nextCount === 0) return
+
+    const behavior = isInitialLoad.current || prevCount === 0 ? 'auto' : 'smooth'
+
+    const doScroll = () => {
+      if (isInitialLoad.current && initialScrollMessageId) {
+        const ok = scrollToMessage(initialScrollMessageId, 'auto')
+        if (ok) return
+      }
+      scrollToBottom(behavior)
+    }
+
+    // Scroll now, then retry to handle images/video metadata pushing layout.
+    const rafId = requestAnimationFrame(doScroll)
+    const t1 = setTimeout(doScroll, 80)
+    const t2 = setTimeout(doScroll, 260)
+
+    isInitialLoad.current = false
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [messages.length, loading, initialScrollMessageId])
 
   useEffect(() => {
         const close = (e) => {
@@ -101,6 +199,7 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
 
   const saveToGalleryMobile = async (msg) => {
     if (!msg) return
+    if (!isLikelyMediaUrl(msg.content)) return
     const fileName = getFileName(msg)
     try {
       const res = await fetch(msg.content)
@@ -249,7 +348,7 @@ export default function MessageList({ messages, currentUser, loading, onEditRequ
   }
 
   return (
-    <div className="message-list" id="message-list">
+    <div ref={listRef} className="message-list" id="message-list">
       {messages.length === 0 ? (
         <div className="messages-empty">
           <span>No messages yet. Say hello! 👋</span>

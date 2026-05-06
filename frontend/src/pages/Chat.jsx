@@ -246,6 +246,17 @@ export default function Chat() {
 
       if (isSelected) addMessage(displayMsg)
       bumpConversation(targetId, { ...displayMsg, content: getPreviewText(msg.messageType, displayMsg.content) }, isSelected)
+
+      // If the chat is currently open, mark as read immediately so sender gets blue ticks.
+      if (isSelected) {
+        if (isGroup) {
+          const groupId = (msg.group?._id || msg.group)?.toString?.()
+          if (groupId) socket?.emit('groupMessagesRead', { groupId })
+        } else {
+          if (senderId) socket?.emit('messagesRead', { from: senderId })
+        }
+      }
+
       showIncomingNotification(
         { ...displayMsg, content: getPreviewText(msg.messageType, displayMsg.content) },
         { isGroup, isSelected }

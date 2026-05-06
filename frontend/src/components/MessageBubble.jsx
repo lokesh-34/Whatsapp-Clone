@@ -125,6 +125,24 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
 
   // Determine message type and render accordingly
   const renderContent = () => {
+    const content = (message?.content ?? '').toString()
+    const isLikelyMediaUrl = (value) => {
+      if (!value) return false
+      const v = value.toString().trim()
+      if (!v) return false
+      if (v === '[encrypted]') return false
+      return /^(https?:\/\/|blob:|data:|\/)/i.test(v)
+    }
+
+    // If decryption failed (or content isn't a URL), don't try to load media.
+    if (
+      message?.messageType &&
+      !['text', 'emoji'].includes(message.messageType) &&
+      !isLikelyMediaUrl(content)
+    ) {
+      return <span className="bubble-text">[encrypted]</span>
+    }
+
     if (isScheduled) {
       const scheduledTime = message.scheduledFor
         ? new Date(message.scheduledFor).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
@@ -169,7 +187,7 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
           </div>
           <audio
             ref={audioRef}
-            src={message.content}
+            src={content}
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleEnded}
             style={{ display: 'none' }}
@@ -181,7 +199,7 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
     if (message.messageType === 'emoji') {
       return (
         <span className="emoji-message" style={{ fontSize: '48px' }}>
-          {message.content}
+          {content}
         </span>
       )
     }
@@ -191,16 +209,16 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
       return (
         <div className="attachment-message attachment-message--photo attachment-message--whatsapp">
           <div className="attachment-media-wrap attachment-media-wrap--photo">
-            <img src={message.content} alt="Shared attachment" className="attachment-photo attachment-photo--whatsapp" loading="lazy" />
+            <img src={content} alt="Shared attachment" className="attachment-photo attachment-photo--whatsapp" loading="lazy" />
             <div className="attachment-photo-overlay">
               <div className="attachment-photo-actions">
                 <button className="attachment-action-btn attachment-action-btn--photo" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
                   <Maximize2 size={14} />
                 </button>
-                <button className="attachment-action-btn attachment-action-btn--photo" title="Download" onClick={() => handleDownload(message.content, fileName)}>
+                <button className="attachment-action-btn attachment-action-btn--photo" title="Download" onClick={() => handleDownload(content, fileName)}>
                   <Download size={14} />
                 </button>
-                <button className="attachment-action-btn attachment-action-btn--photo" title="Save" onClick={() => handleSave(message.content, fileName)}>
+                <button className="attachment-action-btn attachment-action-btn--photo" title="Save" onClick={() => handleSave(content, fileName)}>
                   <Save size={14} />
                 </button>
               </div>
@@ -247,15 +265,15 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
       return (
         <div className="attachment-message attachment-message--video">
           <div className="attachment-media-wrap">
-            <video src={message.content} controls className="attachment-video" preload="metadata" />
+            <video src={content} controls className="attachment-video" preload="metadata" />
             <div className="attachment-actions">
               <button className="attachment-action-btn" title="Fullscreen" onClick={() => onOpenMedia && onOpenMedia(message)}>
                 <Maximize2 size={14} />
               </button>
-              <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, fileName)}>
+              <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(content, fileName)}>
                 <Download size={14} />
               </button>
-              <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, fileName)}>
+              <button className="attachment-action-btn" title="Save" onClick={() => handleSave(content, fileName)}>
                 <Save size={14} />
               </button>
             </div>
@@ -271,10 +289,10 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
           <span className="attachment-doc-icon">📄</span>
           <span className="attachment-doc-name">{name}</span>
           <div className="attachment-inline-actions">
-            <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(message.content, name)}>
+            <button className="attachment-action-btn" title="Download" onClick={() => handleDownload(content, name)}>
               <Download size={14} />
             </button>
-            <button className="attachment-action-btn" title="Save" onClick={() => handleSave(message.content, name)}>
+            <button className="attachment-action-btn" title="Save" onClick={() => handleSave(content, name)}>
               <Save size={14} />
             </button>
           </div>
@@ -285,7 +303,7 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
     if (message.messageType === 'location') {
       const label = message.attachmentMeta?.label || 'Open location'
       return (
-        <a className="attachment-message attachment-message--location" href={message.content} target="_blank" rel="noreferrer">
+        <a className="attachment-message attachment-message--location" href={content} target="_blank" rel="noreferrer">
           <span className="attachment-location-icon">📍</span>
           <span className="attachment-location-text">{label}</span>
         </a>
@@ -293,7 +311,7 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
     }
 
     // Default text message
-    return <span className="bubble-text">{message.content}</span>
+    return <span className="bubble-text">{content}</span>
   }
 
   const showEdited = message.editedAt && !isScheduled
@@ -305,6 +323,7 @@ export default function MessageBubble({ message, isMine, onEditRequest, onOpenMe
   return (
     <>
       <motion.div
+        data-message-id={message?._id}
         className={`bubble-row ${isMine ? 'bubble-row--mine' : 'bubble-row--theirs'}`}
         initial={{ opacity: 0, x: isMine ? 24 : -24, scale: 0.92 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}

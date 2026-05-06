@@ -12,6 +12,7 @@ import ForwardDialog from '../ForwardDialog'
 
 export default function ChatWindow({ currentUser, selectedUser, messages, loading, onSend, onEditMessage, isOnline, isTyping, onBack, forwardingMessage, forwardUsers = [], onForwardRecipientSelect, onCancelForward, onForwardRequest, onMessageUpdate, onMessageRemove, onOpenScheduled, onCreateGroup }) {
   const [editingMessage, setEditingMessage] = useState(null)
+  const [initialScrollMessageId, setInitialScrollMessageId] = useState(null)
   const emptyRef = useRef(null)
 
   useEffect(() => {
@@ -32,7 +33,40 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
 
   useEffect(() => {
     setEditingMessage(null)
+    setInitialScrollMessageId(null)
   }, [selectedUser?._id])
+
+  useEffect(() => {
+    if (!selectedUser || loading) return
+    if (initialScrollMessageId) return
+    if (!Array.isArray(messages) || messages.length === 0) return
+
+    const myId = currentUser?._id?.toString?.() || currentUser?._id || currentUser?.id
+    const selectedId = selectedUser?._id?.toString?.() || selectedUser?._id
+
+    const toId = (value) => value?._id?.toString?.() || value?.toString?.() || value?.id
+
+    let firstUnread = null
+
+    if (selectedUser.isGroup) {
+      firstUnread = messages.find((msg) => {
+        const senderId = toId(msg.sender)
+        if (!senderId || senderId === myId) return false
+        const seenBy = Array.isArray(msg.seenBy) ? msg.seenBy : []
+        const hasSeen = seenBy.some((entry) => toId(entry?.user) === myId)
+        return !hasSeen
+      })
+    } else {
+      firstUnread = messages.find((msg) => {
+        const senderId = toId(msg.sender)
+        if (!senderId || !selectedId) return false
+        if (senderId !== selectedId) return false
+        return !msg.read && !msg.readAt
+      })
+    }
+
+    if (firstUnread?._id) setInitialScrollMessageId(firstUnread._id)
+  }, [selectedUser, loading, messages, currentUser, initialScrollMessageId])
 
   if (!selectedUser) {
     return (
@@ -132,6 +166,8 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
 
       {isTyping && <TypingIndicator />}
       <MessageList 
+        activeChatId={selectedUser?._id}
+        initialScrollMessageId={initialScrollMessageId}
         messages={messages} 
         currentUser={currentUser} 
         loading={loading} 

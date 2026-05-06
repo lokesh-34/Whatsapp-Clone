@@ -27,8 +27,12 @@ const useChatStore = create((set, get) => ({
   }),
 
   // ── Real-time Status Updates ───────────────────────────────
-  updateMessageStatus: ({ messageIds, deliveredAt, readAt, read, scheduledStatus, sentAt, scheduledFor }) => {
-    const idStrings = (messageIds || []).map(id => id.toString())
+  updateMessageStatus: ({ messageIds, messageId, deliveredAt, readAt, read, scheduledStatus, sentAt, scheduledFor }) => {
+    const normalizedIds = Array.isArray(messageIds) && messageIds.length
+      ? messageIds
+      : (messageId ? [messageId] : [])
+
+    const idStrings = normalizedIds.map((id) => id.toString())
     
     set((state) => ({
       messages: state.messages.map((msg) => {
