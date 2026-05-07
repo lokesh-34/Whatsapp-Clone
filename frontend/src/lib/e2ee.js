@@ -10,7 +10,7 @@
   - Keys NEVER leave the browser unencrypted (private key never sent to backend)
 */
 
-import { getPublicKey as apiGetPublicKey, postPublicKey as apiPostPublicKey } from '../api'
+import { getPublicKey as apiGetPublicKey, postPublicKey as apiPostPublicKey, getMyE2EEKeyPair as apiGetMyE2EEKeyPair, setMyE2EEKeyPair as apiSetMyE2EEKeyPair } from '../api'
 
 const enc = new TextEncoder()
 const dec = new TextDecoder()
@@ -103,20 +103,47 @@ export async function generateAndStoreKeyPairAndUpload() {
 
 export async function ensureKeyPairAndUploadIfMissing() {
   let priv = getPrivateJwk()
-  if (!priv) {
-    return await generateAndStoreKeyPairAndUpload()
-  }
 
-  // If a private key already exists locally, re-upload the matching public key.
-  // This fixes cases where the browser kept the private key but the server row is empty.
+  // 1) Prefer server-synced keypair (enables decryption on a new browser/profile).
   try {
-    const pub = privateJwkToPublicJwk(priv)
-    await apiPostPublicKey(pub)
+    const { data } = await apiGetMyE2EEKeyPair()
+    if (data?.privateKey) {
+      savePrivateJwk(data.privateKey)
+      return { privateKey: data.privateKey, publicKey: data.publicKey || null }
+    }
   } catch (e) {
-    console.warn('Failed to re-upload public key:', e.message || e)
+    // ignore; fall back to local/generate
+    console.warn('Failed to fetch E2EE keypair:', e.message || e)
   }
 
-  return { privateKey: priv }
+  // 2) If we have local private key, attempt to sync it to server (first-time).
+  if (priv) {
+    try {
+      const pub = privateJwkToPublicJwk(priv)
+      await apiSetMyE2EEKeyPair({ publicKey: pub, privateKey: priv })
+    } catch (e) {
+      // If server refuses due to mismatch, we keep local key and still re-upload public.
+      console.warn('Failed to sync E2EE keypair:', e?.response?.data?.message || e.message || e)
+    }
+
+    try {
+      const pub = privateJwkToPublicJwk(priv)
+      await apiPostPublicKey(pub)
+    } catch (e) {
+      console.warn('Failed to re-upload public key:', e.message || e)
+    }
+
+    return { privateKey: priv }
+  }
+
+  // 3) No key anywhere: generate a new keypair, store locally and on server.
+  const created = await generateAndStoreKeyPairAndUpload()
+  try {
+    await apiSetMyE2EEKeyPair({ publicKey: created.publicKey, privateKey: created.privateKey })
+  } catch (e) {
+    console.warn('Failed to sync E2EE keypair:', e?.response?.data?.message || e.message || e)
+  }
+  return created
 }
 
 export async function generateAESKey() {
@@ -197,7 +224,7 @@ export async function encryptForChat(senderId, receiverId, plaintext) {
   // on a fresh browser/device where the AES key isn't cached locally.
   let priv = getPrivateJwk()
   if (!priv) {
-    const created = await generateAndStoreKeyPairAndUpload()
+    const created = await ensureKeyPairAndUploadIfMissing()
     priv = created.privateKey
   }
   const senderPublicJwk = privateJwkToPublicJwk(priv)

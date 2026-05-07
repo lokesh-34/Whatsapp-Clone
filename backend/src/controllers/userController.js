@@ -104,6 +104,63 @@ const getPublicKey = async (req, res, next) => {
   }
 }
 
+// ── GET /api/users/e2ee-keypair  (get my E2EE public+private key)
+const getMyE2EEKeyPair = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('publicKey e2eePrivateKey')
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' })
+    res.status(200).json({
+      success: true,
+      publicKey: user.publicKey || null,
+      privateKey: user.e2eePrivateKey || null,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// ── POST /api/users/e2ee-keypair  (set my E2EE public+private key)
+const setMyE2EEKeyPair = async (req, res, next) => {
+  try {
+    const { publicKey, privateKey } = req.body || {}
+    if (!publicKey || !privateKey) {
+      return res.status(400).json({ success: false, message: 'publicKey and privateKey are required.' })
+    }
+
+    const user = await User.findById(req.user._id).select('publicKey e2eePrivateKey')
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' })
+
+    // If a keypair already exists, do not rotate silently (would break decrypt for older messages).
+    if (user.e2eePrivateKey) {
+      const pubMatches = !user.publicKey || user.publicKey === publicKey
+      const privMatches = user.e2eePrivateKey === privateKey
+      if (!pubMatches || !privMatches) {
+        return res.status(409).json({
+          success: false,
+          message: 'E2EE keypair already exists for this account and does not match the provided keypair.',
+        })
+      }
+      return res.status(200).json({ success: true, message: 'E2EE keypair already saved.' })
+    }
+
+    // One-time sync: if we don't have a private key stored yet, accept the provided keypair.
+    // This may rotate the public key and make older messages undecryptable, but it prevents
+    // users getting stuck in a permanent “new browser can't decrypt” state.
+    const previousPublicKey = user.publicKey
+    user.publicKey = publicKey
+    user.e2eePrivateKey = privateKey
+    await user.save()
+
+    res.status(200).json({
+      success: true,
+      message: 'E2EE keypair saved.',
+      rotated: Boolean(previousPublicKey && previousPublicKey !== publicKey),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 // @desc    Pin/unpin a conversation
 // @route   PATCH /api/users/pin-conversation/:userId
 // @access  Private
@@ -176,4 +233,4 @@ const markConversationRead = async (req, res, next) => {
   }
 }
 
-module.exports = { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey, togglePinConversation, toggleStarConversation, markConversationRead }
+module.exports = { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey, getMyE2EEKeyPair, setMyE2EEKeyPair, togglePinConversation, toggleStarConversation, markConversationRead }

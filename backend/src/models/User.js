@@ -73,6 +73,14 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    // E2EE private key (JWK JSON string) — stored for keypair sync across browsers.
+    // NOTE: This weakens true end-to-end encryption; for production, encrypt this
+    // client-side with a passphrase or store in secure device keystores.
+    e2eePrivateKey: {
+      type: String,
+      default: null,
+      select: false,
+    },
     // Pinned conversations (for sidebar)
     pinnedConversations: {
       type: [mongoose.Schema.Types.ObjectId],

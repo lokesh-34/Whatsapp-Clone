@@ -55,6 +55,8 @@ export const sendGroupMessage = (groupId, payload) => API.post(`/groups/${groupI
 // ── E2EE public key exchange ─────────────────────────────────
 export const getPublicKey     = (userId)         => API.get(`/users/public-key/${userId}`)
 export const postPublicKey    = (publicKey)      => API.post('/users/public-key', { publicKey })
+export const getMyE2EEKeyPair = ()               => API.get('/users/e2ee-keypair')
+export const setMyE2EEKeyPair = (payload)        => API.post('/users/e2ee-keypair', payload)
 
 // ── Conversation Preferences ────────────────────────────────
 export const togglePinConversation = (userId)  => API.patch(`/users/pin-conversation/${userId}`)

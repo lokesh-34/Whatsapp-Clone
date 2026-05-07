@@ -1,6 +1,6 @@
 const express = require('express')
 const { body } = require('express-validator')
-const { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey, togglePinConversation, toggleStarConversation, markConversationRead } = require('../controllers/userController')
+const { searchUsers, getAllUsers, getUserById, registerPushToken, setPublicKey, getPublicKey, getMyE2EEKeyPair, setMyE2EEKeyPair, togglePinConversation, toggleStarConversation, markConversationRead } = require('../controllers/userController')
 const { protect } = require('../middlewares/auth')
 
 const router = express.Router()
@@ -16,6 +16,10 @@ router.post('/public-key', [body('publicKey').notEmpty().withMessage('Public key
 
 // GET /api/users/public-key/:userId  — fetch other's public key (must be before /:id)
 router.get('/public-key/:userId', getPublicKey)
+
+// GET/POST /api/users/e2ee-keypair — sync my E2EE keypair across browsers
+router.get('/e2ee-keypair', getMyE2EEKeyPair)
+router.post('/e2ee-keypair', [body('publicKey').notEmpty(), body('privateKey').notEmpty()], setMyE2EEKeyPair)
 
 // PATCH /api/users/pin-conversation/:userId  — pin/unpin a conversation
 router.patch('/pin-conversation/:userId', togglePinConversation)
