@@ -103,14 +103,56 @@ const useChatStore = create((set, get) => ({
     const targetId = userId.toString()
     const chats = Array.isArray(state.recentChats) ? state.recentChats : []
     const entry = chats.find(c => (c.user?._id || c.user)?.toString() === targetId)
+
+    const inferredIsGroup = Boolean(lastMessage?.group)
+    const lastSenderId = (lastMessage?.sender?._id || lastMessage?.sender)?.toString?.()
+    const shouldIncrementUnread = !isSelected && (
+      inferredIsGroup ? true : (lastSenderId && lastSenderId === targetId)
+    )
+
+    let inferredUser = entry?.user || { _id: userId }
+    if (inferredIsGroup && lastMessage?.group) {
+      const group = lastMessage.group
+      inferredUser = {
+        _id: group._id || group,
+        username: group.name || 'Group chat',
+        avatar: group.avatar || null,
+        avatarColor: '#22313a',
+        description: group.description || '',
+        members: group.members || [],
+        isGroup: true,
+      }
+    } else if (!inferredIsGroup && lastMessage?.sender && lastSenderId === targetId) {
+      const sender = lastMessage.sender
+      inferredUser = {
+        ...(typeof sender === 'object' ? sender : { _id: sender }),
+        username: (typeof sender === 'object' ? sender.username : undefined) || 'Unknown',
+        avatarColor: (typeof sender === 'object' ? sender.avatarColor : undefined) || '#22313a',
+        isGroup: false,
+      }
+    } else {
+      inferredUser = {
+        ...inferredUser,
+        username: inferredUser?.username || 'Unknown',
+        avatarColor: inferredUser?.avatarColor || '#22313a',
+        isGroup: Boolean(inferredUser?.isGroup) || inferredIsGroup,
+      }
+    }
     
     const updatedEntry = entry 
       ? { 
           ...entry, 
           lastMessage, 
-          unreadCount: isSelected ? 0 : (entry.unreadCount || 0) + (lastMessage.sender === userId ? 1 : 0) 
+          isGroup: typeof entry.isGroup === 'boolean' ? entry.isGroup : inferredIsGroup,
+          user: { ...inferredUser, isGroup: inferredUser?.isGroup ?? inferredIsGroup },
+          unreadCount: isSelected ? 0 : (entry.unreadCount || 0) + (shouldIncrementUnread ? 1 : 0),
         }
-      : { user: { _id: userId }, lastMessage, unreadCount: 1 }
+      : {
+          user: { ...inferredUser, isGroup: inferredUser?.isGroup ?? inferredIsGroup },
+          isGroup: inferredIsGroup,
+          lastMessage,
+          unreadCount: shouldIncrementUnread ? 1 : 0,
+        }
 
     const filtered = chats.filter(c => (c.user?._id || c.user)?.toString() !== targetId)
     return { recentChats: [updatedEntry, ...filtered] }

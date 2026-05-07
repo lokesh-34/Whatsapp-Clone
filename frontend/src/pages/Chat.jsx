@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth }   from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
 import Sidebar       from '../components/Sidebar/Sidebar'
@@ -62,41 +62,54 @@ export default function Chat() {
   const [starredOpen, setStarredOpen] = useState(false)
   const [groupsOpen, setGroupsOpen] = useState(false)
 
+  const refreshSidebar = useCallback(async () => {
+    if (!user) return
+    try {
+      const [conversationsRes, groupsRes] = await Promise.all([getConversations(), getGroups()])
+      const conversations = conversationsRes?.data?.conversations || []
+      const groups = groupsRes?.data?.groups || []
+
+      const hydratedDirect = await Promise.all(conversations.map(async (conv) => {
+        const lastMessage = conv.lastMessage
+        if (!lastMessage?.encryptedMessage) return { ...conv, isGroup: false }
+        try {
+          const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
+          return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: getPreviewText(lastMessage.messageType, content) } }
+        } catch {
+          return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: '[encrypted]' } }
+        }
+      }))
+
+      const hydratedGroups = groups.map((group) => ({
+        user: { _id: group._id, username: group.name, avatarColor: '#22313a', avatar: group.avatar || null, isGroup: true, description: group.description || '', members: group.members || [] },
+        lastMessage: group.lastMessage ? { ...group.lastMessage, content: getPreviewText(group.lastMessage.messageType, group.lastMessage.encryptedMessage || '') } : null,
+        unreadCount: group.unreadCount || 0,
+        isGroup: true,
+      }))
+
+      const merged = [...hydratedDirect, ...hydratedGroups].sort((a, b) => {
+        const aTime = new Date(a.lastMessage?.sentAt || a.lastMessage?.createdAt || 0).getTime()
+        const bTime = new Date(b.lastMessage?.sentAt || b.lastMessage?.createdAt || 0).getTime()
+        return bTime - aTime
+      })
+      setRecentChats(merged)
+    } catch (err) {
+      console.error('Conversations error:', err)
+    }
+  }, [user, setRecentChats])
+
   // ── Load Conversations ────────────────────────────────────
   useEffect(() => {
-    if (!user) return
-    Promise.all([getConversations(), getGroups()])
-      .then(async ([conversationsRes, groupsRes]) => {
-        const conversations = conversationsRes?.data?.conversations || []
-        const groups = groupsRes?.data?.groups || []
+    refreshSidebar()
+  }, [refreshSidebar])
 
-        const hydratedDirect = await Promise.all(conversations.map(async (conv) => {
-          const lastMessage = conv.lastMessage
-          if (!lastMessage?.encryptedMessage) return { ...conv, isGroup: false }
-          try {
-            const content = await e2ee.decryptMessageObject(user._id, lastMessage, conv.user._id)
-            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: getPreviewText(lastMessage.messageType, content) } }
-          } catch {
-            return { ...conv, isGroup: false, lastMessage: { ...lastMessage, content: '[encrypted]' } }
-          }
-        }))
-
-        const hydratedGroups = groups.map((group) => ({
-          user: { _id: group._id, username: group.name, avatarColor: '#22313a', avatar: group.avatar || null, isGroup: true, description: group.description || '', members: group.members || [] },
-          lastMessage: group.lastMessage ? { ...group.lastMessage, content: getPreviewText(group.lastMessage.messageType, group.lastMessage.encryptedMessage || '') } : null,
-          unreadCount: group.unreadCount || 0,
-          isGroup: true,
-        }))
-
-        const merged = [...hydratedDirect, ...hydratedGroups].sort((a, b) => {
-          const aTime = new Date(a.lastMessage?.sentAt || a.lastMessage?.createdAt || 0).getTime()
-          const bTime = new Date(b.lastMessage?.sentAt || b.lastMessage?.createdAt || 0).getTime()
-          return bTime - aTime
-        })
-        setRecentChats(merged)
-      })
-      .catch(err => console.error('Conversations error:', err))
-  }, [user, setRecentChats])
+  const prevGroupsOpen = useRef(false)
+  useEffect(() => {
+    if (prevGroupsOpen.current && !groupsOpen) {
+      refreshSidebar()
+    }
+    prevGroupsOpen.current = groupsOpen
+  }, [groupsOpen, refreshSidebar])
 
   useEffect(() => {
     if (!user) return
@@ -233,9 +246,11 @@ export default function Chat() {
     const handleNewMessage = async (msg) => {
       const senderId = (msg.sender?._id || msg.sender)?.toString?.()
       const isGroup = Boolean(msg.group)
-      const targetId = isGroup ? msg.group.toString() : senderId
+      const groupId = isGroup ? (msg.group?._id || msg.group)?.toString?.() : null
+      const targetId = isGroup ? groupId : senderId
+      if (!targetId) return
       if (isGroup && senderId === user?._id?.toString?.()) return
-      const isSelected = isGroup ? selectedUser?._id === targetId : selectedUser?._id === senderId
+      const isSelected = isGroup ? selectedUser?._id === groupId : selectedUser?._id === senderId
 
       let displayMsg = msg
       if (isGroup) displayMsg = { ...msg, content: msg.encryptedMessage }
@@ -264,6 +279,25 @@ export default function Chat() {
     }
 
     socket.on('newMessage', handleNewMessage)
+    socket.on('addedToGroup', (payload) => {
+      try {
+        if (typeof window === 'undefined' || !('Notification' in window)) return
+        if (Notification.permission !== 'granted') {
+          // don't prompt here; just refresh the sidebar
+          refreshSidebar()
+          return
+        }
+        const groupName = payload?.group?.name || payload?.groupName || 'a group'
+        const addedBy = payload?.addedBy?.username || 'Someone'
+        new Notification('Added to group', {
+          body: `${addedBy} added you to ${groupName}`,
+          icon: '/vite.svg',
+          tag: `group-added-${payload?.groupId || groupName}`,
+        })
+      } finally {
+        refreshSidebar()
+      }
+    })
     socket.on('messageStatusUpdated', updateMessageStatus)
     socket.on('messageEdited', async (data) => {
       try {
@@ -277,13 +311,14 @@ export default function Chat() {
 
     return () => {
       socket.off('newMessage')
+      socket.off('addedToGroup')
       socket.off('messageStatusUpdated')
       socket.off('messageEdited')
       socket.off('messagePinned')
       socket.off('messageStarred')
       socket.off('messageDeleted')
     }
-  }, [socket, selectedUser, user, addMessage, bumpConversation, updateMessageStatus, updateMessage, removeMessage, showIncomingNotification])
+  }, [socket, selectedUser, user, addMessage, bumpConversation, updateMessageStatus, updateMessage, removeMessage, showIncomingNotification, refreshSidebar])
 
   const isSearchMode = debouncedQuery.trim().length > 0
   const displayList  = isSearchMode ? searchResults.map(u => ({ user: u, lastMessage: null, unreadCount: 0 })) : recentChats
@@ -337,7 +372,7 @@ export default function Chat() {
         onCloseScheduled={() => setScheduledOpen(false)}
       />
       <StarredMessages open={starredOpen} onClose={() => setStarredOpen(false)} currentUser={user} onOpenChat={handleSelectUser} />
-      <GroupManager open={groupsOpen} onClose={() => setGroupsOpen(false)} currentUser={user} />
+      <GroupManager open={groupsOpen} onClose={() => setGroupsOpen(false)} currentUser={user} onGroupsChanged={refreshSidebar} />
       <ScheduledList open={scheduledOpen && !!selectedUser} onClose={() => setScheduledOpen(false)} userId={selectedUser?._id} onCancelled={() => setScheduledOpen(false)} />
     </div>
   )

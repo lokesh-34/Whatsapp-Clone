@@ -87,7 +87,7 @@ export default function ForwardDialog({ message, open, onClose, onForward, curre
             onClick={() => setSelectedUserId(user._id)}
           >
             <div className="forward-user-avatar" style={{ background: user.avatarColor }}>
-              {user.username[0].toUpperCase()}
+              {(user.username?.[0] || '?').toUpperCase()}
             </div>
             <span className="forward-user-name">{user.username}</span>
           </button>

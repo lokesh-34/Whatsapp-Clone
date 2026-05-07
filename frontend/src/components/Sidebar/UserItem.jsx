@@ -19,7 +19,7 @@ export default function UserItem({ user, isSelected, isOnline, unreadCount, onCl
       <div className="user-item-avatar-wrap">
         <Avatar style={{ background: user.avatarColor, width: 44, height: 44 }}>
           <AvatarFallback style={{ background: user.avatarColor, color: '#fff', fontSize: 18, fontWeight: 700 }}>
-            {user.username[0].toUpperCase()}
+            {(user.username?.[0] || '?').toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <span className={`online-dot ${isOnline ? 'online-dot--on' : ''}`} />

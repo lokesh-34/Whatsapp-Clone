@@ -137,7 +137,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, loadin
             <AvatarFallback style={{ background: selectedUser.avatarColor, color: '#fff', fontSize: 18, fontWeight: 700 }}>
               {selectedUser.avatar
                 ? <img src={selectedUser.avatar} alt={selectedUser.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                : selectedUser.username[0].toUpperCase()}
+                : (selectedUser.username?.[0] || '?').toUpperCase()}
             </AvatarFallback>
           </Avatar>
           {!selectedUser.isGroup && <span className={`online-dot ${isOnline(selectedUser._id) ? 'online-dot--on' : ''}`} />}

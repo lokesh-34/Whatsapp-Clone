@@ -90,7 +90,7 @@ function DialogShell({ title, description, onClose, children, actionText, onActi
   )
 }
 
-export default function GroupManager({ open, onClose, currentUser }) {
+export default function GroupManager({ open, onClose, currentUser, onGroupsChanged }) {
   const [groups, setGroups] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -229,6 +229,7 @@ export default function GroupManager({ open, onClose, currentUser }) {
       await loadGroups()
       setSelectedGroupId(data.group?._id || '')
       setCreateOpen(false)
+      onGroupsChanged?.()
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to create group.')
     } finally {
@@ -244,6 +245,7 @@ export default function GroupManager({ open, onClose, currentUser }) {
       await renameGroupApi(selectedGroup._id, { name: renameName.trim(), avatar: renameAvatar })
       await loadGroups()
       setRenameOpen(false)
+      onGroupsChanged?.()
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to rename group.')
     } finally {
@@ -258,6 +260,7 @@ export default function GroupManager({ open, onClose, currentUser }) {
     try {
       await addGroupMembers(selectedGroup._id, { memberIds: [userId] })
       await loadGroups()
+      onGroupsChanged?.()
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to add member.')
     } finally {
@@ -272,6 +275,7 @@ export default function GroupManager({ open, onClose, currentUser }) {
     try {
       await removeGroupMembers(selectedGroup._id, { memberIds: [userId] })
       await loadGroups()
+      onGroupsChanged?.()
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to remove member.')
     } finally {
@@ -490,6 +494,32 @@ export default function GroupManager({ open, onClose, currentUser }) {
                   onChange={(event) => setCreateSearch(event.target.value)}
                 />
               </div>
+
+              {createMembers.length > 0 && (
+                <div className="groups-section">
+                  <div className="groups-section-header">
+                    <h4>Added members</h4>
+                    <span>{createMembers.length}</span>
+                  </div>
+                  <div className="groups-add-list groups-add-list--create">
+                    {users
+                      .filter((u) => createMembers.includes(u._id))
+                      .sort((a, b) => (a.username || '').localeCompare(b.username || ''))
+                      .map((u) => (
+                        <UserRow
+                          key={u._id}
+                          user={u}
+                          actionLabel="Remove"
+                          actionIcon={UserMinus}
+                          onAction={() => toggleCreateMember(u._id)}
+                          disabled={saving}
+                          compact
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <div className="groups-add-list groups-add-list--create">
                 {createCandidates.length === 0 && <div className="groups-empty groups-empty--inline">No users found.</div>}
                 {createCandidates.map((user) => (

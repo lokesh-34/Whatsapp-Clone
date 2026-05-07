@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const Group = require('../models/Group')
 const User = require('../models/User')
 const Message = require('../models/Message')
+const { getIO } = require('../socket/io')
 
 const GROUP_USER_FIELDS = '_id username email avatarColor isOnline lastSeen avatar'
 
@@ -47,6 +48,19 @@ const getMissingUserIds = async (userIds) => {
 }
 
 const formatGroupResponse = (group) => group.toObject ? group.toObject() : group
+
+const emitAddedToGroup = (userIds, payload) => {
+  try {
+    const io = getIO()
+    if (!io) return
+    userIds.forEach((userId) => {
+      if (!userId) return
+      io.to(toIdString(userId)).emit('addedToGroup', payload)
+    })
+  } catch (error) {
+    console.error('Failed to emit addedToGroup:', error.message)
+  }
+}
 
 const getLastGroupMessage = async (groupId, userId) => Message.findOne({
   group: groupId,
@@ -133,6 +147,13 @@ const createGroup = async (req, res, next) => {
     })
 
     const populatedGroup = await populateGroup(Group.findById(group._id))
+    if (filteredMemberIds.length) {
+      emitAddedToGroup(filteredMemberIds, {
+        groupId: group._id,
+        group: formatGroupResponse(populatedGroup),
+        addedBy: { _id: req.user._id, username: req.user.username },
+      })
+    }
     res.status(201).json({ success: true, group: formatGroupResponse(populatedGroup) })
   } catch (error) {
     next(error)
@@ -327,6 +348,13 @@ const addGroupMembers = async (req, res, next) => {
     }
 
     const populatedGroup = await populateGroup(Group.findById(group._id))
+    if (newMemberIds.length) {
+      emitAddedToGroup(newMemberIds, {
+        groupId: group._id,
+        group: formatGroupResponse(populatedGroup),
+        addedBy: { _id: req.user._id, username: req.user.username },
+      })
+    }
     res.status(200).json({ success: true, group: formatGroupResponse(populatedGroup), added: newMemberIds.length })
   } catch (error) {
     next(error)
