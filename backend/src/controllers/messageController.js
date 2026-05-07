@@ -64,6 +64,7 @@ const getConversations = async (req, res, next) => {
             encryptedMessage: '$lastMessage.encryptedMessage',
             iv: '$lastMessage.iv',
             encryptedKey: '$lastMessage.encryptedKey',
+            encryptedKeySender: '$lastMessage.encryptedKeySender',
             deliveredAt: '$lastMessage.deliveredAt',
             readAt: '$lastMessage.readAt',
             createdAt: '$lastMessage.createdAt',
@@ -141,7 +142,7 @@ const sendMessage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: errors.array()[0].msg })
 
     const { userId }  = req.params
-    const { encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = req.body
+    const { encryptedMessage, iv, encryptedKey, encryptedKeySender, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = req.body
     const senderId    = req.user._id
 
     if (userId === senderId.toString())
@@ -162,6 +163,7 @@ const sendMessage = async (req, res, next) => {
       encryptedMessage,
       iv,
       encryptedKey: encryptedKey || null,
+      encryptedKeySender: encryptedKeySender || null,
       messageType,
       voiceDuration: messageType === 'voice' ? voiceDuration : null,
       attachmentMeta: attachmentMeta || null,
@@ -294,7 +296,7 @@ module.exports = { getConversations, getMessages, sendMessage, getUnreadCounts, 
 const editMessage = async (req, res, next) => {
   try {
     const { messageId } = req.params
-    const { encryptedMessage, iv, encryptedKey } = req.body
+    const { encryptedMessage, iv, encryptedKey, encryptedKeySender } = req.body
     const myId = req.user._id
     const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000 // 15 minutes
 
@@ -321,6 +323,7 @@ const editMessage = async (req, res, next) => {
     message.encryptedMessage = encryptedMessage
     message.iv = iv
     message.encryptedKey = encryptedKey || message.encryptedKey
+    message.encryptedKeySender = encryptedKeySender || message.encryptedKeySender
     message.editedAt = new Date()
     await message.save()
 
@@ -340,6 +343,7 @@ const editMessage = async (req, res, next) => {
           encryptedMessage: message.encryptedMessage,
           iv: message.iv,
           encryptedKey: message.encryptedKey,
+          encryptedKeySender: message.encryptedKeySender,
           editedAt: message.editedAt,
         }
         io.to(message.sender._id?.toString() || message.sender.toString()).emit('messageEdited', payload)
@@ -504,7 +508,7 @@ const deleteMessage = async (req, res, next) => {
 const forwardMessage = async (req, res, next) => {
   try {
     const { messageId } = req.params
-    const { to, encryptedMessage, iv, encryptedKey } = req.body
+    const { to, encryptedMessage, iv, encryptedKey, encryptedKeySender } = req.body
     const senderId = req.user._id
 
     if (!to || !encryptedMessage) {
@@ -532,6 +536,7 @@ const forwardMessage = async (req, res, next) => {
       encryptedMessage,
       iv,
       encryptedKey: encryptedKey || null,
+      encryptedKeySender: encryptedKeySender || null,
       messageType: originalMessage.messageType,
       voiceDuration: originalMessage.voiceDuration || null,
       attachmentMeta: originalMessage.attachmentMeta || null,

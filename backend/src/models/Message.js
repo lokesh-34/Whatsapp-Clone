@@ -34,6 +34,12 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Encrypted AES key for the sender (RSA-OAEP wrapped) so the sender can
+    // decrypt their own sent messages on a fresh device/browser.
+    encryptedKeySender: {
+      type: String,
+      default: null,
+    },
     deliveredAt: {
       type: Date,
       default: null,

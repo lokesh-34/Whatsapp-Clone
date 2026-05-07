@@ -69,7 +69,7 @@ const socketHandler = (io) => {
     // ── sendMessage ─────────────────────────────────────────
     socket.on('sendMessage', async (data, callback) => {
       try {
-        const { to, encryptedMessage, iv, encryptedKey, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = data
+        const { to, encryptedMessage, iv, encryptedKey, encryptedKeySender, messageType = 'text', voiceDuration = null, scheduledFor = null, attachmentMeta = null } = data
 
         if (!to || !encryptedMessage) {
           return callback?.({ success: false, error: 'Invalid message data.' })
@@ -93,6 +93,7 @@ const socketHandler = (io) => {
           encryptedMessage,
           iv,
           encryptedKey: encryptedKey || null,
+          encryptedKeySender: encryptedKeySender || null,
           messageType,
           voiceDuration: messageType === 'voice' ? voiceDuration : null,
           attachmentMeta: attachmentMeta || null,

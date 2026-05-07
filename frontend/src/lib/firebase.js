@@ -30,11 +30,16 @@ export const messaging = isFirebaseConfigured ? getMessaging(firebaseApp) : null
  */
 export const requestForToken = async () => {
   if (!messaging) return null
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
+  if (!vapidKey) return null
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null
   try {
     const permission = await Notification.requestPermission()
     if (permission === 'granted') {
+      const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
       const token = await getToken(messaging, {
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, // Needs to be generated in Firebase Console
+        vapidKey, // Needs to be generated in Firebase Console
+        serviceWorkerRegistration: swReg,
       })
       if (token) return token
       console.warn('No registration token available. Request permission to generate one.')

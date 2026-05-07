@@ -122,7 +122,8 @@ export default function MessageList({ activeChatId, initialScrollMessageId, mess
   useEffect(() => {
         const close = (e) => {
           // Don't close if clicking on menu or arrow button
-          if (e.target.closest('.message-context-menu') || e.target.closest('.bubble-menu-trigger')) {
+          const target = e.target instanceof Element ? e.target : e.target?.parentElement
+          if (target?.closest?.('.message-context-menu') || target?.closest?.('.bubble-menu-trigger')) {
             return
           }
           setMenuState({ open: false, x: 0, y: 0, message: null })

@@ -174,6 +174,7 @@ export async function encryptForChat(senderId, receiverId, plaintext) {
   const chatId = getChatId(senderId, receiverId)
   let aesRaw = getAESForChat(chatId)
   let encryptedKey = null
+  let encryptedKeySender = null
 
   // Always wrap the chat AES key for the receiver so any message can bootstrap
   // a fresh device/browser without depending on the first message.
@@ -192,25 +193,45 @@ export async function encryptForChat(senderId, receiverId, plaintext) {
   receiverPublicKey = data.publicKey
   encryptedKey = await encryptAESKeyWithRSA(receiverPublicKey, aesRaw)
 
+  // Also wrap for sender so the sender can decrypt their own sent messages
+  // on a fresh browser/device where the AES key isn't cached locally.
+  let priv = getPrivateJwk()
+  if (!priv) {
+    const created = await generateAndStoreKeyPairAndUpload()
+    priv = created.privateKey
+  }
+  const senderPublicJwk = privateJwkToPublicJwk(priv)
+  encryptedKeySender = await encryptAESKeyWithRSA(senderPublicJwk, aesRaw)
+
   const aesKey = await importAESRaw(aesRaw)
   const { encryptedMessage, iv } = await encryptWithAESGCM(aesKey, plaintext)
-  return { encryptedMessage, iv, encryptedKey }
+  return { encryptedMessage, iv, encryptedKey, encryptedKeySender }
 }
 
 // High-level decryption for a received message object
 // partnerId should be the other participant in the chat.
 export async function decryptMessageObject(myId, message, partnerIdOverride = null) {
-  const partnerId = partnerIdOverride || (message.sender?._id ? message.sender._id : message.sender)
+  const myIdStr = myId?.toString?.() || String(myId)
+  const senderId = (message.sender?._id || message.sender || message.senderId)?.toString?.() || (message.sender?._id || message.sender || message.senderId)
+  const receiverId = (message.receiver?._id || message.receiver || message.receiverId)?.toString?.() || (message.receiver?._id || message.receiver || message.receiverId)
+  const partnerId = partnerIdOverride || (senderId?.toString?.() === myIdStr ? receiverId : senderId)
   const chatId = getChatId(myId, partnerId)
   let aesRaw = getAESForChat(chatId)
 
-  if (!aesRaw && message.encryptedKey) {
+  if (!aesRaw) {
+    const isFromMe = senderId?.toString?.() === myIdStr
+    const wrappedKey = isFromMe
+      ? (message.encryptedKeySender || message.encryptedKey)
+      : (message.encryptedKey || message.encryptedKeySender)
+
+    if (wrappedKey) {
     const priv = getPrivateJwk()
     if (!priv) throw new Error('Private key not found for decryption')
     // decrypt AES raw using our private key
-    const rawB64 = await decryptAESKeyWithRSA(priv, message.encryptedKey)
-    aesRaw = rawB64
-    saveAESForChat(chatId, aesRaw)
+      const rawB64 = await decryptAESKeyWithRSA(priv, wrappedKey)
+      aesRaw = rawB64
+      saveAESForChat(chatId, aesRaw)
+    }
   }
 
   if (!aesRaw) {

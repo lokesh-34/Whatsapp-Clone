@@ -3,27 +3,37 @@ importScripts('https://www.gstatic.com/firebasejs/10.10.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.10.0/firebase-messaging-compat.js');
 
 // Initialize the Firebase app in the service worker by passing in the messagingSenderId.
-firebase.initializeApp({
+const swConfig = {
   apiKey: "REPLACED_BY_RUNTIME", // Not strictly needed for background SW usually
   messagingSenderId: "REPLACED_BY_RUNTIME",
-});
+}
 
-const messaging = firebase.messaging();
+const isPlaceholderConfig = Object.values(swConfig).some((v) => !v || v === 'REPLACED_BY_RUNTIME')
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+if (!isPlaceholderConfig) {
+  try {
+    firebase.initializeApp(swConfig)
+    const messaging = firebase.messaging()
 
-  const notificationTitle = payload.notification?.title || payload.data?.senderName || 'New Message';
-  const notificationOptions = {
-    body: payload.notification?.body || 'Check your messages.',
-    icon: '/logo192.png', // Replace with your app icon if available
-    tag: 'whatsapp-clone-notification',
-    data: payload.data,
-  };
+    // Handle background messages
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[firebase-messaging-sw.js] Received background message ', payload)
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+      const notificationTitle = payload.notification?.title || payload.data?.senderName || 'New Message'
+      const notificationOptions = {
+        body: payload.notification?.body || 'Check your messages.',
+        icon: '/logo192.png',
+        tag: 'whatsapp-clone-notification',
+        data: payload.data,
+      }
+
+      self.registration.showNotification(notificationTitle, notificationOptions)
+    })
+  } catch (e) {
+    // Never crash SW evaluation: push notifications are optional.
+    console.warn('[firebase-messaging-sw.js] Firebase init failed:', e?.message || e)
+  }
+}
 
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
